@@ -1,22 +1,27 @@
 version: "3.8"
 
 services:
-  # 🧱 Servicio de autenticación (Keycloak)
   keycloak:
     image: quay.io/keycloak/keycloak:21.1.1
-    command: start-dev --import-realm
+    command:
+      - start-dev
+      - --https-port=8443
+      - --https-key-store-file=/opt/keycloak/conf/keycloak-keystore.p12
+      - --https-key-store-password=password
+      - --hostname-strict=false
+      - --hostname-url=https://localhost:9443
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
-      - "8080:8080"
+      - "9443:8443"
     volumes:
-      - ./keycloak_data:/opt/keycloak/data # Persistencia local
-      - ./import:/opt/keycloak/data/import # Importación automática del realm
+      - ./keycloak_certs/keycloak-keystore.p12:/opt/keycloak/conf/keycloak-keystore.p12
+      - ./keycloak_data:/opt/keycloak/data # 🧱 persist data here
     networks:
-      - app-network # 🔹 Conectado a la red
+      - app-network
 
-  # ⚙️ Servicio del backend (API con Spring Boot y HTTPS)
+  # ⚙️ Spring Boot API with HTTPS
   api:
     build:
       context: ./API
@@ -29,54 +34,38 @@ services:
       SERVER_SSL_KEY_STORE_PASSWORD: 123456
       SERVER_SSL_KEY_STORE_TYPE: PKCS12
       SERVER_SSL_KEY_ALIAS: api-cert
-      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/parcial-realm
+      KEYCLOAK_ISSUER_URI: https://keycloak:8443/realms/parcial-realm
     ports:
-      - "8443:8443"
+      - "9444:8443" # host 9444 -> container 8443
     depends_on:
       - keycloak
     volumes:
       - ./API/src/main/resources/keystore.p12:/app/keystore.p12
     networks:
-      - app-network # 🔹 Conectado a la red
+      - app-network
 
-  # 💻 Servicio del frontend (Vite + Nginx)
+  # 🌐 Frontend (Vite / React)
   frontend:
     build:
       context: ./Frontend/Logiin
-      dockerfile: Dockerfile
-    environment:
-      - VITE_API_URL=https://api:8443 # 🔹 Usa nombre del servicio API
+      dockerfile: Dockerfile.dev
+    command: npm run dev -- --host 0.0.0.0
     ports:
-      - "3000:80"
+      - "5173:5173"
+    volumes:
+      - ./Frontend/Logiin:/app
+      - /app/node_modules
+      - ./Frontend/Logiin/certs:/certs
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=https://api:8443
+      - VITE_KEYCLOAK_URL=https://localhost:9443
     depends_on:
       - api
-    networks:
-      - app-network # 🔹 Conectado a la red
-
-  # ⚙️ Servicio del cliente (microservicio)
-  service-client:
-    build:
-      context: ./Microservicio
-      dockerfile: Dockerfile
-    container_name: service-client
-    depends_on:
-      - keycloak
-      - api
-    environment:
-      SERVER_PORT: 8082
-      KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/parcial-realm/protocol/openid-connect/token
-      KEYCLOAK_CLIENT_ID: service-client
-      KEYCLOAK_CLIENT_SECRET: EK3YHkuGg7c9djjBYopwyddobcAbDgHn
-      KEYCLOAK_SCOPE: service.read
-      API_PROTECTED_URL: https://api:8443/service/data
-    ports:
-      - "8082:8082"
     networks:
       - app-network
-    stdin_open: true # 🔹 Permite interacción desde teclado (modo interactivo)
-    tty: true # 🔹 Mantiene la consola abierta (simula terminal real)
 
-# 🌐 Red compartida
+# 🌐 Shared network
 networks:
   app-network:
     driver: bridge
