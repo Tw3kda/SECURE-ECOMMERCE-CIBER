@@ -1,0 +1,33 @@
+FROM quay.io/keycloak/keycloak:24.0.2
+
+# Switch to root to create directories
+USER root
+
+# Create conf directory (correct path for newer versions)
+RUN mkdir -p /opt/keycloak/conf
+
+# Generate keystore with proper settings
+RUN keytool -genkeypair \
+    -alias keycloak \
+    -keyalg RSA \
+    -keysize 2048 \
+    -validity 3650 \
+    -storetype PKCS12 \
+    -keystore /opt/keycloak/conf/keycloak.p12 \
+    -storepass password \
+    -keypass password \
+    -dname "CN=keycloak, OU=Dev, O=Company, L=City, ST=State, C=CO" \
+    -ext "SAN=DNS:keycloak,DNS:localhost,IP:127.0.0.1"
+
+# Export certificate
+RUN keytool -exportcert \
+    -alias keycloak \
+    -keystore /opt/keycloak/conf/keycloak.p12 \
+    -storepass password \
+    -rfc -file /opt/keycloak/conf/keycloak.crt
+
+# Fix permissions
+RUN chown -R keycloak:keycloak /opt/keycloak/conf
+
+# Switch back to keycloak user
+USER keycloak

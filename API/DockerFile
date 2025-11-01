@@ -1,36 +1,63 @@
-# Usa una imagen ligera de Java 21
-FROM openjdk:21-jdk-slim
+# ---------- 1️⃣ Build Stage ----------
+FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
-# Establece el directorio de trabajo
 WORKDIR /app
 
-# Copia archivos de configuración de Maven
+# Copy pom.xml and download dependencies first (for build caching)
 COPY pom.xml .
-COPY mvnw .
-COPY .mvn .mvn
+RUN mvn dependency:go-offline -B
 
-# Descarga dependencias para optimizar la cache de build
-RUN ./mvnw dependency:go-offline
+# Copy the rest of the source
+COPY src ./src
 
-# Copia el resto del código fuente
-COPY . .
+# Build the JAR
+RUN mvn clean package -DskipTests
 
-# Copia el keystore al contenedor (asegúrate de que está en src/main/resources/)
+
+# ---------- 2️⃣ Runtime Stage ----------
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+# Copy compiled JAR and SSL keystore FROM THE BUILDER STAGE
+COPY --from=builder /app/target/*.jar app.jar
 COPY src/main/resources/keystore.p12 /app/keystore.p12
 
-# Compila el proyecto sin ejecutar tests
-RUN ./mvnw clean package -DskipTests
+# Create an entrypoint script that imports the cert and reads the secret
+RUN echo '#!/bin/bash' > /entrypoint.sh && \
+    echo 'CERT_PATH="/app/keycloak_certs/keycloak-cert.pem"' >> /entrypoint.sh && \
+    echo 'if [ -f "$CERT_PATH" ]; then' >> /entrypoint.sh && \
+    echo '  echo "🔐 Importing Keycloak certificate into Java truststore..."' >> /entrypoint.sh && \
+    echo '  keytool -importcert -trustcacerts -noprompt -alias keycloak -file "$CERT_PATH" -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit || true' >> /entrypoint.sh && \
+    echo 'else' >> /entrypoint.sh && \
+    echo '  echo "⚠️ No Keycloak certificate found at $CERT_PATH (skipping import)"' >> /entrypoint.sh && \
+    echo 'fi' >> /entrypoint.sh && \
+    echo '# Read client secret from Docker secret file' >> /entrypoint.sh && \
+    echo 'if [ -f "/run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET" ]; then' >> /entrypoint.sh && \
+    echo '  echo "🔑 Setting KEYCLOAK_CLIENT_SECRET from secret file"' >> /entrypoint.sh && \
+    echo '  export KEYCLOAK_CLIENT_SECRET=$(cat /run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET)' >> /entrypoint.sh && \
+    echo '  echo "KEYCLOAK_CLIENT_SECRET length: ${#KEYCLOAK_CLIENT_SECRET}"' >> /entrypoint.sh && \
+    echo 'elif [ -f "$KEYCLOAK_CLIENT_SECRET_FILE" ]; then' >> /entrypoint.sh && \
+    echo '  echo "🔑 Setting KEYCLOAK_CLIENT_SECRET from KEYCLOAK_CLIENT_SECRET_FILE"' >> /entrypoint.sh && \
+    echo '  export KEYCLOAK_CLIENT_SECRET=$(cat $KEYCLOAK_CLIENT_SECRET_FILE)' >> /entrypoint.sh && \
+    echo '  echo "KEYCLOAK_CLIENT_SECRET length: ${#KEYCLOAK_CLIENT_SECRET}"' >> /entrypoint.sh && \
+    echo 'else' >> /entrypoint.sh && \
+    echo '  echo "⚠️ No client secret file found"' >> /entrypoint.sh && \
+    echo 'fi' >> /entrypoint.sh && \
+    echo 'echo "🚀 Starting Spring Boot app..."' >> /entrypoint.sh && \
+    echo 'exec java -jar app.jar' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
 
-# Expone el puerto HTTPS
 EXPOSE 8443
 
-# Variables de entorno para SSL
-ENV SERVER_SSL_ENABLED=true
-ENV SERVER_PORT=8443
-ENV SERVER_SSL_KEY_STORE=/app/keystore.p12
-ENV SERVER_SSL_KEY_STORE_PASSWORD=123456
-ENV SERVER_SSL_KEY_STORE_TYPE=PKCS12
-ENV SERVER_SSL_KEY_ALIAS=api-cert
+ENV SPRING_APPLICATION_NAME=demo \
+    SERVER_PORT=8443 \
+    SERVER_SSL_ENABLED=true \
+    SERVER_SSL_KEY_STORE=/app/keystore.p12 \
+    SERVER_SSL_KEY_STORE_TYPE=PKCS12 \
+    SERVER_SSL_KEY_ALIAS=api-cert
 
-# Comando de ejecución
-ENTRYPOINT ["java", "-jar", "target/demo-0.0.1-SNAPSHOT.jar"]
+# Copy application.yml if it exists in the build context
+COPY ./application.yml /app/application.yml
+
+ENTRYPOINT ["/entrypoint.sh"]

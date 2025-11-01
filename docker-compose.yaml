@@ -2,26 +2,34 @@ version: "3.8"
 
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1.1
+    image: quay.io/keycloak/keycloak:24.0.2
     command:
       - start-dev
       - --https-port=8443
       - --https-key-store-file=/opt/keycloak/conf/keycloak-keystore.p12
       - --https-key-store-password=password
       - --hostname-strict=false
-      - --hostname-url=https://localhost:9443
+      - --hostname-strict-https=false
+      - --proxy=edge
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN_FILE: /run/secrets/KEYCLOAK_ADMIN
+      KEYCLOAK_ADMIN_PASSWORD_FILE: /run/secrets/KEYCLOAK_ADMIN_PASSWORD
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+      KC_PROXY: edge
     ports:
       - "9443:8443"
     volumes:
-      - ./keycloak_certs/keycloak-keystore.p12:/opt/keycloak/conf/keycloak-keystore.p12
-      - ./keycloak_data:/opt/keycloak/data # 🧱 persist data here
+      - ./keycloak_certs/keycloak-keystore.p12:/opt/keycloak/conf/keycloak-keystore.p12:ro
+      - ./keycloak_certs/keycloak-cert.pem:/opt/keycloak/conf/keycloak-cert.pem:ro
+      - ./keycloak_data:/opt/keycloak/data
+    secrets:
+      - KEYCLOAK_ADMIN
+      - KEYCLOAK_ADMIN_PASSWORD
     networks:
       - app-network
 
-  # ⚙️ Spring Boot API with HTTPS
   api:
     build:
       context: ./API
@@ -31,20 +39,32 @@ services:
       SERVER_PORT: 8443
       SERVER_SSL_ENABLED: "true"
       SERVER_SSL_KEY_STORE: /app/keystore.p12
-      SERVER_SSL_KEY_STORE_PASSWORD: 123456
+      SERVER_SSL_KEY_STORE_PASSWORD_FILE: /run/secrets/SERVER_SSL_KEY_STORE_PASSWORD
       SERVER_SSL_KEY_STORE_TYPE: PKCS12
       SERVER_SSL_KEY_ALIAS: api-cert
-      KEYCLOAK_ISSUER_URI: https://keycloak:8443/realms/parcial-realm
+
+      # 🔑 Keycloak configuration
+      KEYCLOAK_URL: https://keycloak:8443
+      KEYCLOAK_REALM: Ecommerce
+      KEYCLOAK_CLIENT_ID: backend-client
+      KEYCLOAK_CLIENT_SECRET_FILE: /run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET
+
+      # 🧩 OAuth2 issuer
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://keycloak:8443/realms/Ecommerce
+
     ports:
-      - "9444:8443" # host 9444 -> container 8443
+      - "9444:8443"
     depends_on:
       - keycloak
     volumes:
-      - ./API/src/main/resources/keystore.p12:/app/keystore.p12
+      - ./API/src/main/resources/keystore.p12:/app/keystore.p12:ro
+      - ./keycloak_certs/keycloak-cert.pem:/app/keycloak_certs/keycloak-cert.pem:ro
+    secrets:
+      - SERVER_SSL_KEY_STORE_PASSWORD
+      - KEYCLOAK_BACKEND_CLIENT_SECRET
     networks:
       - app-network
 
-  # 🌐 Frontend (Vite / React)
   frontend:
     build:
       context: ./Frontend/Logiin
@@ -58,14 +78,23 @@ services:
       - ./Frontend/Logiin/certs:/certs
     environment:
       - CHOKIDAR_USEPOLLING=true
-      - VITE_API_URL=https://api:8443
+      - VITE_API_URL=https://localhost:9444
       - VITE_KEYCLOAK_URL=https://localhost:9443
     depends_on:
       - api
     networks:
       - app-network
 
-# 🌐 Shared network
 networks:
   app-network:
     driver: bridge
+
+secrets:
+  KEYCLOAK_ADMIN:
+    file: ./secrets/KEYCLOAK_ADMIN.txt
+  KEYCLOAK_ADMIN_PASSWORD:
+    file: ./secrets/KEYCLOAK_ADMIN_PASSWORD.txt
+  SERVER_SSL_KEY_STORE_PASSWORD:
+    file: ./secrets/SERVER_SSL_KEY_STORE_PASSWORD.txt
+  KEYCLOAK_BACKEND_CLIENT_SECRET:
+    file: ./secrets/KEYCLOAK_BACKEND_CLIENT_SECRET.txt

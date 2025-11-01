@@ -1,26 +1,38 @@
-import React, { useEffect } from "react";
-import { keycloak } from "../../keycloak";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getKeycloak } from "../../keycloak";
 
 export default function Login() {
+  const keycloak = getKeycloak();
+  const [authenticated, setAuthenticated] = useState(keycloak.authenticated);
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Redirige inmediatamente a Keycloak
-    keycloak.login();
-  }, []);
+    // ✅ If already authenticated, go straight to dashboard
+    if (keycloak.authenticated) {
+      navigate("/dashboard");
+    } else {
+      // ✅ Otherwise trigger Keycloak login automatically
+      keycloak.login({
+        redirectUri: `${window.location.origin}/dashboard`,
+      });
+    }
+  }, [keycloak, navigate]);
 
   return (
     <div style={styles.container}>
-      <p>Redirecting to Keycloak login...</p>
+      <h2>Redirecting to Keycloak...</h2>
     </div>
   );
 }
 
 const styles = {
   container: {
-    height: "100vh",
     display: "flex",
+    flexDirection: "column",
+    height: "100vh",
     justifyContent: "center",
     alignItems: "center",
-    fontSize: "1.2rem",
-    fontFamily: "sans-serif",
+    backgroundColor: "#f5f5f5",
   },
 };

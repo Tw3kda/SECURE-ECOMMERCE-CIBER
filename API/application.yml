@@ -12,4 +12,26 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://keycloak:8080/realms/parcial-realm
+          issuer-uri: https://keycloak:8443/realms/parcial-realm
+      client:
+        registration:
+          keycloak:
+            client-id: backend-client
+            client-secret: ${KEYCLOAK_CLIENT_SECRET:default-secret-change-me}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            issuer-uri: https://keycloak:8443/realms/parcial-realm
+
+keycloak:
+  auth-server-url: https://keycloak:8443
+  realm: parcial-realm
+  resource: backend-client
+  credentials:
+    secret: ${KEYCLOAK_CLIENT_SECRET:default-secret-change-me}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.keycloak: DEBUG
+    com.patrones.api: DEBUG
