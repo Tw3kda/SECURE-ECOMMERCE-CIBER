@@ -5,33 +5,34 @@ server:
     key-store: classpath:keystore.p12
     key-store-type: PKCS12
     key-alias: api-cert
-    key-store-password: 123456
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:123456}
 
 spring:
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: https://keycloak:8443/realms/parcial-realm
+          issuer-uri: http://keycloak:8080/realms/Ecommerce
       client:
         registration:
           keycloak:
             client-id: backend-client
-            client-secret: ${KEYCLOAK_CLIENT_SECRET:default-secret-change-me}
+            client-secret: ${KEYCLOAK_BACKEND_CLIENT_SECRET}
             authorization-grant-type: client_credentials
         provider:
           keycloak:
-            issuer-uri: https://keycloak:8443/realms/parcial-realm
+            issuer-uri: http://keycloak:8080/realms/Ecommerce
 
 keycloak:
-  auth-server-url: https://keycloak:8443
-  realm: parcial-realm
+  auth-server-url: http://keycloak:8080
+  realm: Ecommerce
   resource: backend-client
   credentials:
-    secret: ${KEYCLOAK_CLIENT_SECRET:default-secret-change-me}
+    secret: ${KEYCLOAK_BACKEND_CLIENT_SECRET}
+  ssl-required: none
 
 logging:
   level:
-    org.springframework.security: DEBUG
     org.keycloak: DEBUG
+    org.springframework.security: DEBUG
     com.patrones.api: DEBUG

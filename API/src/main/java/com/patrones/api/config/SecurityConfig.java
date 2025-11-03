@@ -1,71 +1,141 @@
 package com.patrones.api.config;
 
 import java.util.List;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 @Configuration
 public class SecurityConfig {
 
+    // =============================================
+    // 🔓 ENDPOINTS PÚBLICOS (Sin autenticación)
+    // =============================================
+    private static final String[] PUBLIC_PATHS = {
+        // Autenticación y registro
+        "/auth/**",
+        "/api/auth/**",
+        
+        // Testing y health checks
+        "/test",
+        "/api/test", 
+        "/debug/**",
+        "/health",
+        
+        // Documentación API
+        "/swagger-ui/**",
+        "/v3/api-docs/**",
+        "/api-docs/**",
+        
+        // Archivos estáticos y errores
+        "/error",
+        "/favicon.ico",
+        "/public/**"
+    };
+
+    // =============================================
+    // 🔐 ENDPOINTS PRIVADOS (Requieren JWT + Scopes)
+    // =============================================
+    private static final String[] SERVICE_PATHS = {
+        "/service/**"
+    };
+    
+    private static final String[] USER_PATHS = {
+        "/user/**"
+    };
+    
+    private static final String[] ADMIN_PATHS = {
+        "/admin/**"
+    };
+
+    // 🔓 Public endpoints - COMPLETELY BYPASS SECURITY (no JWT, no authentication)
     @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(request -> {
-            CorsConfiguration config = new CorsConfiguration();
-            config.setAllowedOrigins(List.of("http://localhost:5173", "https://localhost:5173"));
-            config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-            config.setAllowedHeaders(List.of("*"));
-            config.setAllowCredentials(true);
-            return config;
-        }))
-        .authorizeHttpRequests(auth -> auth
-            // ✅ Public endpoints (no JWT required)
-            .requestMatchers("/auth/**", "/test").permitAll()
+    @Order(1)
+    public SecurityFilterChain publicFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(PUBLIC_PATHS)
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().permitAll()  // No authentication required
+            )
+            // CRITICAL: Disable all authentication for this filter chain
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-            // 🔒 Protected endpoints
-            .requestMatchers("/service/**").hasAuthority("SCOPE_service.read")
-            .requestMatchers("/user/**").hasAuthority("SCOPE_user.read")
-            .anyRequest().authenticated()
-        )
-        // ✅ Only enforce JWT for protected routes
-        .oauth2ResourceServer(oauth2 -> 
-            oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-        );
+        return http.build();
+    }
 
-    return http.build();
-}
+    // 🔐 Protected endpoints - WITH JWT processing
+    @Bean
+    @Order(2)
+    public SecurityFilterChain protectedFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                // ========================
+                // 🔐 ENDPOINTS PRIVADOS
+                // ========================
+                
+                // Servicios - requiere scope service.read
+                .requestMatchers(SERVICE_PATHS).hasAuthority("SCOPE_service.read")
+                
+                // Usuarios - requiere scope user.read  
+                .requestMatchers(USER_PATHS).hasAuthority("SCOPE_user.read")
+                
+                // Administración - requiere scope admin
+                .requestMatchers(ADMIN_PATHS).hasAuthority("SCOPE_admin")
+                
+                // ========================
+                // 🛡️ SEGURIDAD POR DEFECTO
+                // ========================
+                .anyRequest().authenticated()  // All other endpoints need JWT
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+            )
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
+        return http.build();
+    }
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter converter = new JwtGrantedAuthoritiesConverter();
-        converter.setAuthorityPrefix("SCOPE_"); // 👈 Importante el guion bajo
-        converter.setAuthoritiesClaimName("scope");
-
-        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
-        jwtConverter.setJwtGrantedAuthoritiesConverter(converter);
-        return jwtConverter;
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthorityPrefix("SCOPE_");
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("scope");
+        
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        
+        return jwtAuthenticationConverter;
     }
 
-    // Filtro CORS adicional para asegurar compatibilidad con navegadores
     @Bean
-    public CorsFilter corsFilter() {
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(
+            "http://localhost:5173", 
+            "https://localhost:5173",
+            "http://localhost:3000",
+            "https://localhost:3000"
+        ));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowCredentials(true);
-        config.setAllowedOrigins(List.of("http://localhost:5173", "https://localhost:5173"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

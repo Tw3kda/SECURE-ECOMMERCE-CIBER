@@ -1,28 +1,25 @@
-version: "3.8"
-
 services:
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0.2
+    build:
+      context: ./
+      dockerfile: Dockerfile.keycloak
+    image: secure-keycloak:latest
     command:
       - start-dev
+      - --http-enabled=true
+      - --http-port=8080
       - --https-port=8443
-      - --https-key-store-file=/opt/keycloak/conf/keycloak-keystore.p12
-      - --https-key-store-password=password
       - --hostname-strict=false
       - --hostname-strict-https=false
-      - --proxy=edge
     environment:
       KEYCLOAK_ADMIN_FILE: /run/secrets/KEYCLOAK_ADMIN
       KEYCLOAK_ADMIN_PASSWORD_FILE: /run/secrets/KEYCLOAK_ADMIN_PASSWORD
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
-      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
       KC_PROXY: edge
     ports:
-      - "9443:8443"
+      - "9443:8443" # HTTPS (external frontend login)
+      - "8080:8080" # HTTP (internal API communication)
     volumes:
-      - ./keycloak_certs/keycloak-keystore.p12:/opt/keycloak/conf/keycloak-keystore.p12:ro
-      - ./keycloak_certs/keycloak-cert.pem:/opt/keycloak/conf/keycloak-cert.pem:ro
+      - ./keycloak_certs:/opt/keycloak/conf
       - ./keycloak_data:/opt/keycloak/data
     secrets:
       - KEYCLOAK_ADMIN
@@ -35,22 +32,25 @@ services:
       context: ./API
       dockerfile: Dockerfile
     environment:
-      SPRING_APPLICATION_NAME: demo
+      SPRING_APPLICATION_NAME: ecommerce-api
       SERVER_PORT: 8443
       SERVER_SSL_ENABLED: "true"
       SERVER_SSL_KEY_STORE: /app/keystore.p12
-      SERVER_SSL_KEY_STORE_PASSWORD_FILE: /run/secrets/SERVER_SSL_KEY_STORE_PASSWORD
+      SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:-123456}
       SERVER_SSL_KEY_STORE_TYPE: PKCS12
       SERVER_SSL_KEY_ALIAS: api-cert
 
-      # 🔑 Keycloak configuration
-      KEYCLOAK_URL: https://keycloak:8443
-      KEYCLOAK_REALM: Ecommerce
-      KEYCLOAK_CLIENT_ID: backend-client
+      # 🎯 KEY FIX: Read secret from file and set as environment variable
       KEYCLOAK_CLIENT_SECRET_FILE: /run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET
 
-      # 🧩 OAuth2 issuer
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: https://keycloak:8443/realms/Ecommerce
+      # Other Keycloak settings
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: Ecommerce
+      KEYCLOAK_CLIENT_ID: backend-client
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/Ecommerce
+      KEYCLOAK_RESOURCE: backend-client
+      KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_SSL_REQUIRED: none
 
     ports:
       - "9444:8443"
@@ -58,9 +58,7 @@ services:
       - keycloak
     volumes:
       - ./API/src/main/resources/keystore.p12:/app/keystore.p12:ro
-      - ./keycloak_certs/keycloak-cert.pem:/app/keycloak_certs/keycloak-cert.pem:ro
     secrets:
-      - SERVER_SSL_KEY_STORE_PASSWORD
       - KEYCLOAK_BACKEND_CLIENT_SECRET
     networks:
       - app-network

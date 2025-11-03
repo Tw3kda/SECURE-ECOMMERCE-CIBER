@@ -21,43 +21,9 @@ WORKDIR /app
 
 # Copy compiled JAR and SSL keystore FROM THE BUILDER STAGE
 COPY --from=builder /app/target/*.jar app.jar
-COPY src/main/resources/keystore.p12 /app/keystore.p12
+COPY --from=builder /app/src/main/resources/keystore.p12 /app/keystore.p12
 
-# Create an entrypoint script that imports the cert and reads the secret
-RUN echo '#!/bin/bash' > /entrypoint.sh && \
-    echo 'CERT_PATH="/app/keycloak_certs/keycloak-cert.pem"' >> /entrypoint.sh && \
-    echo 'if [ -f "$CERT_PATH" ]; then' >> /entrypoint.sh && \
-    echo '  echo "🔐 Importing Keycloak certificate into Java truststore..."' >> /entrypoint.sh && \
-    echo '  keytool -importcert -trustcacerts -noprompt -alias keycloak -file "$CERT_PATH" -keystore "$JAVA_HOME/lib/security/cacerts" -storepass changeit || true' >> /entrypoint.sh && \
-    echo 'else' >> /entrypoint.sh && \
-    echo '  echo "⚠️ No Keycloak certificate found at $CERT_PATH (skipping import)"' >> /entrypoint.sh && \
-    echo 'fi' >> /entrypoint.sh && \
-    echo '# Read client secret from Docker secret file' >> /entrypoint.sh && \
-    echo 'if [ -f "/run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET" ]; then' >> /entrypoint.sh && \
-    echo '  echo "🔑 Setting KEYCLOAK_CLIENT_SECRET from secret file"' >> /entrypoint.sh && \
-    echo '  export KEYCLOAK_CLIENT_SECRET=$(cat /run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET)' >> /entrypoint.sh && \
-    echo '  echo "KEYCLOAK_CLIENT_SECRET length: ${#KEYCLOAK_CLIENT_SECRET}"' >> /entrypoint.sh && \
-    echo 'elif [ -f "$KEYCLOAK_CLIENT_SECRET_FILE" ]; then' >> /entrypoint.sh && \
-    echo '  echo "🔑 Setting KEYCLOAK_CLIENT_SECRET from KEYCLOAK_CLIENT_SECRET_FILE"' >> /entrypoint.sh && \
-    echo '  export KEYCLOAK_CLIENT_SECRET=$(cat $KEYCLOAK_CLIENT_SECRET_FILE)' >> /entrypoint.sh && \
-    echo '  echo "KEYCLOAK_CLIENT_SECRET length: ${#KEYCLOAK_CLIENT_SECRET}"' >> /entrypoint.sh && \
-    echo 'else' >> /entrypoint.sh && \
-    echo '  echo "⚠️ No client secret file found"' >> /entrypoint.sh && \
-    echo 'fi' >> /entrypoint.sh && \
-    echo 'echo "🚀 Starting Spring Boot app..."' >> /entrypoint.sh && \
-    echo 'exec java -jar app.jar' >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
+# Simple entrypoint - no certificate import needed for HTTP
+CMD ["java", "-jar", "app.jar"]
 
 EXPOSE 8443
-
-ENV SPRING_APPLICATION_NAME=demo \
-    SERVER_PORT=8443 \
-    SERVER_SSL_ENABLED=true \
-    SERVER_SSL_KEY_STORE=/app/keystore.p12 \
-    SERVER_SSL_KEY_STORE_TYPE=PKCS12 \
-    SERVER_SSL_KEY_ALIAS=api-cert
-
-# Copy application.yml if it exists in the build context
-COPY ./application.yml /app/application.yml
-
-ENTRYPOINT ["/entrypoint.sh"]

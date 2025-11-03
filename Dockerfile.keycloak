@@ -1,33 +1,60 @@
 FROM quay.io/keycloak/keycloak:24.0.2
 
-# Switch to root to create directories
 USER root
 
-# Create conf directory (correct path for newer versions)
+# Create directory
 RUN mkdir -p /opt/keycloak/conf
 
-# Generate keystore with proper settings
+# Generate keystore with proper SAN (Subject Alternative Names)
 RUN keytool -genkeypair \
     -alias keycloak \
     -keyalg RSA \
     -keysize 2048 \
     -validity 3650 \
     -storetype PKCS12 \
-    -keystore /opt/keycloak/conf/keycloak.p12 \
+    -keystore /opt/keycloak/conf/keycloak-keystore.p12 \
     -storepass password \
     -keypass password \
-    -dname "CN=keycloak, OU=Dev, O=Company, L=City, ST=State, C=CO" \
-    -ext "SAN=DNS:keycloak,DNS:localhost,IP:127.0.0.1"
+    -dname "CN=keycloak, OU=Development, O=MyCompany, L=City, ST=State, C=CO" \
+    -ext "SAN=DNS:keycloak,DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1"
 
 # Export certificate
 RUN keytool -exportcert \
     -alias keycloak \
-    -keystore /opt/keycloak/conf/keycloak.p12 \
+    -keystore /opt/keycloak/conf/keycloak-keystore.p12 \
     -storepass password \
-    -rfc -file /opt/keycloak/conf/keycloak.crt
+    -rfc -file /opt/keycloak/conf/keycloak-cert.pem
+
+# Create startup script that reads from secret files
+RUN echo '#!/bin/bash' > /opt/keycloak/start-keycloak.sh && \
+    echo '# Read admin credentials from secret files' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'if [ -f "/run/secrets/KEYCLOAK_ADMIN" ]; then' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  export KEYCLOAK_ADMIN=$(cat /run/secrets/KEYCLOAK_ADMIN)' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  echo "Using admin user from secret: $KEYCLOAK_ADMIN"' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'else' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  echo "WARNING: KEYCLOAK_ADMIN secret not found, using default"' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  export KEYCLOAK_ADMIN=admin' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'fi' >> /opt/keycloak/start-keycloak.sh && \
+    echo '' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'if [ -f "/run/secrets/KEYCLOAK_ADMIN_PASSWORD" ]; then' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  export KEYCLOAK_ADMIN_PASSWORD=$(cat /run/secrets/KEYCLOAK_ADMIN_PASSWORD)' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  echo "Using admin password from secret"' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'else' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  echo "WARNING: KEYCLOAK_ADMIN_PASSWORD secret not found, using default"' >> /opt/keycloak/start-keycloak.sh && \
+    echo '  export KEYCLOAK_ADMIN_PASSWORD=admin123' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'fi' >> /opt/keycloak/start-keycloak.sh && \
+    echo '' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'echo "Starting Keycloak with admin user: $KEYCLOAK_ADMIN"' >> /opt/keycloak/start-keycloak.sh && \
+    echo '' >> /opt/keycloak/start-keycloak.sh && \
+    echo '# Start Keycloak with HTTPS configuration' >> /opt/keycloak/start-keycloak.sh && \
+    echo 'exec /opt/keycloak/bin/kc.sh start-dev --http-enabled=true --https-port=8443 --https-key-store-file=/opt/keycloak/conf/keycloak-keystore.p12 --https-key-store-password=password --hostname-strict=false --hostname-strict-https=false' >> /opt/keycloak/start-keycloak.sh
 
 # Fix permissions
 RUN chown -R keycloak:keycloak /opt/keycloak/conf
+RUN chmod +x /opt/keycloak/start-keycloak.sh
+RUN chmod 644 /opt/keycloak/conf/*
 
-# Switch back to keycloak user
 USER keycloak
+
+# Use the startup script as entrypoint
+ENTRYPOINT ["/opt/keycloak/start-keycloak.sh"]
