@@ -8,6 +8,22 @@ server:
     key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:123456}
 
 spring:
+  application:
+    name: ecommerce-api
+  datasource:
+    url: jdbc:postgresql://db:5432/postgres
+    username: postgres
+    password: ${DB_PASSWORD:postgres_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
   security:
     oauth2:
       resourceserver:
@@ -35,4 +51,9 @@ logging:
   level:
     org.keycloak: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     com.patrones.api: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %msg%n"

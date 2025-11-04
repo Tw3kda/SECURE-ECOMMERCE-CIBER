@@ -36,11 +36,22 @@ services:
       SERVER_PORT: 8443
       SERVER_SSL_ENABLED: "true"
       SERVER_SSL_KEY_STORE: /app/keystore.p12
-      SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:-123456}
+      # 🚨 CAMBIO CRÍTICO: Usar valor directo en lugar de archivo
+      SERVER_SSL_KEY_STORE_PASSWORD: "123456"
       SERVER_SSL_KEY_STORE_TYPE: PKCS12
       SERVER_SSL_KEY_ALIAS: api-cert
 
-      # 🎯 KEY FIX: Read secret from file and set as environment variable
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      # 🚨 CAMBIO: Usar valor directo en lugar de archivo
+      SPRING_DATASOURCE_PASSWORD: "postgres_password"
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+
+      # 🚨 CAMBIO: Leer secret y asignar a variable
       KEYCLOAK_CLIENT_SECRET_FILE: /run/secrets/KEYCLOAK_BACKEND_CLIENT_SECRET
 
       # Other Keycloak settings
@@ -56,10 +67,12 @@ services:
       - "9444:8443"
     depends_on:
       - keycloak
+      - db
     volumes:
       - ./API/src/main/resources/keystore.p12:/app/keystore.p12:ro
     secrets:
       - KEYCLOAK_BACKEND_CLIENT_SECRET
+      # 🚨 REMOVER: SERVER_SSL_KEY_STORE_PASSWORD y DB_PASSWORD de secrets
     networks:
       - app-network
 
@@ -83,9 +96,39 @@ services:
     networks:
       - app-network
 
+  # Use postgres/example user/password credentials
+
+  db:
+    image: postgres:13 # Especificar versión
+    restart: always
+    shm_size: 128mb
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "postgres_password" # Mismo valor que en API
+    ports:
+      - "5432:5432" # Exponer puerto para debugging
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8085:8081
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
+
+# ✅ DEFINIR LOS VOLUMENES
+volumes:
+  postgres_data:
+    driver: local
 
 secrets:
   KEYCLOAK_ADMIN:
@@ -96,3 +139,5 @@ secrets:
     file: ./secrets/SERVER_SSL_KEY_STORE_PASSWORD.txt
   KEYCLOAK_BACKEND_CLIENT_SECRET:
     file: ./secrets/KEYCLOAK_BACKEND_CLIENT_SECRET.txt
+  DB_PASSWORD:
+    file: ./secrets/DB_PASSWORD.txt

@@ -58,6 +58,17 @@
   			<artifactId>keycloak-admin-client</artifactId>
   			<version>21.1.1</version> <!-- match your Keycloak version -->
 		</dependency>
+		<!-- Spring Boot + PostgreSQL -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
 
 	</dependencies>
 

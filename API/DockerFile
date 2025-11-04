@@ -13,17 +13,16 @@ COPY src ./src
 # Build the JAR
 RUN mvn clean package -DskipTests
 
-
 # ---------- 2️⃣ Runtime Stage ----------
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-# Copy compiled JAR and SSL keystore FROM THE BUILDER STAGE
+# Copy compiled JAR
 COPY --from=builder /app/target/*.jar app.jar
-COPY --from=builder /app/src/main/resources/keystore.p12 /app/keystore.p12
 
-# Simple entrypoint - no certificate import needed for HTTP
-CMD ["java", "-jar", "app.jar"]
+# El keystore ya está dentro del JAR (classpath), no necesitas copiarlo por separado
 
 EXPOSE 8443
+
+CMD ["java", "-jar", "app.jar"]
