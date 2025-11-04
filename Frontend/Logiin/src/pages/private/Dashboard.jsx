@@ -105,6 +105,39 @@ export default function Dashboard() {
     }
   };
 
+  const handleAddComment = async (productId, commentText) => {
+    if (!commentText.trim())
+      return alert("⚠️ Escribe un comentario antes de enviar");
+
+    const token = userData?.token || sessionStorage.getItem("token");
+
+    try {
+      const response = await fetch(
+        `https://localhost:9444/api/products/${productId}/comments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ content: commentText }),
+        }
+      );
+
+      if (response.ok) {
+        alert("✅ Comentario agregado correctamente");
+        fetchProducts(token); // recarga productos para ver el nuevo comentario
+      } else if (response.status === 403) {
+        alert("❌ No tienes permiso para comentar");
+      } else {
+        alert("⚠️ Error al enviar comentario");
+      }
+    } catch (error) {
+      console.error("Error al enviar comentario:", error);
+      alert("❌ Error de conexión");
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem("userUID");
     sessionStorage.removeItem("userName");
@@ -279,21 +312,46 @@ export default function Dashboard() {
                     </div>
 
                     {/* SECCIÓN DE COMENTARIOS */}
-                    {product.comments && product.comments.length > 0 && (
-                      <div style={styles.commentsSection}>
-                        <h4>💬 Opiniones ({product.comments.length})</h4>
-                        {product.comments.slice(0, 2).map((comment) => (
+                    <div style={styles.commentsSection}>
+                      <h4>💬 Opiniones</h4>
+
+                      {product.comments && product.comments.length > 0 ? (
+                        product.comments.map((comment) => (
                           <div key={comment.id} style={styles.comment}>
                             <strong>{comment.author}:</strong> {comment.content}
                           </div>
-                        ))}
-                        {product.comments.length > 2 && (
-                          <p style={styles.moreComments}>
-                            +{product.comments.length - 2} más comentarios
-                          </p>
-                        )}
+                        ))
+                      ) : (
+                        <p style={styles.noComments}>No hay comentarios aún.</p>
+                      )}
+
+                      {/* FORMULARIO PARA AGREGAR COMENTARIO */}
+                      <div style={styles.addCommentBox}>
+                        <input
+                          type="text"
+                          placeholder="Escribe tu comentario..."
+                          style={styles.commentInput}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleAddComment(product.id, e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                        <button
+                          style={styles.commentBtn}
+                          onClick={(e) => {
+                            const input = e.target.previousSibling;
+                            if (input.value.trim()) {
+                              handleAddComment(product.id, input.value);
+                              input.value = "";
+                            }
+                          }}
+                        >
+                          ➕ Comentar
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -543,5 +601,30 @@ const styles = {
     textAlign: "center",
     padding: "3rem",
     color: "#6c757d",
+  },
+  noComments: {
+    color: "#6c757d",
+    fontStyle: "italic",
+    marginBottom: "0.5rem",
+  },
+  addCommentBox: {
+    display: "flex",
+    gap: "0.5rem",
+    marginTop: "1rem",
+  },
+  commentInput: {
+    flex: 1,
+    padding: "0.5rem",
+    borderRadius: "0.25rem",
+    border: "1px solid #ced4da",
+  },
+  commentBtn: {
+    padding: "0.5rem 1rem",
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "0.25rem",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
 };

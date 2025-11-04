@@ -62,6 +62,8 @@ public class ProductController {
             @AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
         
         try {
+            System.out.println("Usuario autenticado: " + jwt.getClaimAsString("preferred_username"));
+
             Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new RuntimeException("Product not found"));
             
