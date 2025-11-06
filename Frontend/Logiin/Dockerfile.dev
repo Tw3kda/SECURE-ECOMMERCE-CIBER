@@ -1,17 +1,18 @@
-# Frontend/Dockerfile.dev
-FROM node:20
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copiar package.json y package-lock.json (si existe)
+# Copy package files
 COPY package*.json ./
 
-# Instalar TODAS las dependencias incluyendo devDependencies
+# Install all dependencies
 RUN npm install --include=dev
 
-# Copiar el resto de la aplicación
+# Verify critical dependencies are installed
+RUN npm list @vitejs/plugin-react @tailwindcss/vite || npm install @vitejs/plugin-react @tailwindcss/vite --save-dev
+
+# Copy source code
 COPY . .
 
 EXPOSE 5173
-
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev"]
