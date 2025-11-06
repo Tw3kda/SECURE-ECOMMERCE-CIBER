@@ -3,9 +3,13 @@ FROM node:20
 
 WORKDIR /app
 
+# Copiar package.json y package-lock.json (si existe)
 COPY package*.json ./
-RUN npm install
 
+# Instalar TODAS las dependencias incluyendo devDependencies
+RUN npm install --include=dev
+
+# Copiar el resto de la aplicación
 COPY . .
 
 EXPOSE 5173

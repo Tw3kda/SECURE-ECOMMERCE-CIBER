@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar dependencias
-RUN npm install
+RUN npm install --include=dev
 
 # Copiar todo el proyecto
 COPY . .
@@ -28,4 +28,4 @@ COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
 
 # Comando para iniciar Nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "run", "dev", "nginx", "-g", "daemon off;"]
