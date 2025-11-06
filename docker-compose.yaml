@@ -84,9 +84,14 @@ services:
     ports:
       - "5173:5173"
     volumes:
-      - ./Frontend/Logiin:/app
-      - /app/node_modules
+      # Mount only specific directories for live reload, not the entire app
+      - ./Frontend/Logiin/src:/app/src
+      - ./Frontend/Logiin/public:/app/public
       - ./Frontend/Logiin/certs:/certs
+      # Mount config files
+      - ./Frontend/Logiin/vite.config.js:/app/vite.config.js
+      - ./Frontend/Logiin/index.html:/app/index.html
+      - ./Frontend/Logiin/package.json:/app/package.json
     environment:
       - CHOKIDAR_USEPOLLING=true
       - VITE_API_URL=https://localhost:9444
