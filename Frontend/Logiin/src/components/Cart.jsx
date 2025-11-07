@@ -1,11 +1,19 @@
-import React from 'react';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { useCart } from '../context/CartContext';
-import { QuantitySelector } from './ui/QuantitySelector';
+import React from "react";
+import { Card } from "./ui/card";
+import { Button } from "./ui/button";
+import { useCart } from "../context/CartContext";
+import { QuantitySelector } from "./ui/QuantitySelector";
+import { useNavigate } from "react-router-dom";
 
 export function Cart({ onClose }) {
-  const { cart, updateQuantity, removeFromCart, getCartTotal, clearCart } = useCart();
+  const { cart, updateQuantity, removeFromCart, getCartTotal, clearCart } =
+    useCart();
+
+  const navigate = useNavigate();
+
+  const goToPayment = () => {
+    navigate("/PaymentModule");
+  };
 
   if (cart.length === 0) {
     return (
@@ -42,9 +50,7 @@ export function Cart({ onClose }) {
           <Button onClick={clearCart} variant="destructive" className="w-full">
             Vaciar Carrito
           </Button>
-          <Button className="w-full">
-            Proceder al Pago
-          </Button>
+          <Button className="w-full">Proceder al Pago</Button>
         </div>
       </div>
     </div>
