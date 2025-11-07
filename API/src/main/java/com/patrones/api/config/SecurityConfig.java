@@ -12,27 +12,26 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.core.OAuth2Error;
-import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.*;
 
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+
 
 @Configuration
 public class SecurityConfig {
 
     // ----------------------------
-    // Endpoints públicos
+    // Endpoints públicos (sin token)
     // ----------------------------
     private static final String[] PUBLIC_PATHS = {
-            "/auth/**", "/api/auth/**",
-            "/test", "/api/test",
-            "/health", "/actuator/health",
-            "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**",
-            "/error", "/favicon.ico", "/public/**", "api/test/**"
+        "/auth/**", "/api/auth/**",
+        "/test", "/api/test", "/test/**", "/api/test/**",
+        "/health", "/actuator/health",
+        "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**",
+        "/error", "/favicon.ico", "/public/**"
     };
 
     // ----------------------------
@@ -50,11 +49,13 @@ public class SecurityConfig {
     @Bean
     @Order(1)
     public SecurityFilterChain publicFilterChain(HttpSecurity http) throws Exception {
-        http.securityMatcher(PUBLIC_PATHS)
+        http
+            .securityMatcher(PUBLIC_PATHS)
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
         return http.build();
     }
 
@@ -64,20 +65,16 @@ public class SecurityConfig {
     @Bean
     @Order(2)
     public SecurityFilterChain protectedFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
+        http
+            .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                // Permitir preflight CORS
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Productos: lectura y comentarios → usuarios autenticados
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CORS preflight
                 .requestMatchers(PRODUCT_READ_PATHS).authenticated()
                 .requestMatchers(PRODUCT_WRITE_PATHS).authenticated()
-                // Creación de productos → solo admin
                 .requestMatchers(PRODUCT_ADMIN_PATHS).hasRole("admin")
-                // Otros endpoints protegidos
                 .requestMatchers(CLIENTDATA_PATHS).authenticated()
                 .requestMatchers(PAYMENT_PATHS).authenticated()
-                // Cualquier otro → autenticado
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
@@ -94,22 +91,19 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(new Converter<Jwt, Collection<GrantedAuthority>>() {
-            @Override
-            public Collection<GrantedAuthority> convert(Jwt jwt) {
-                Collection<String> realmRoles = Optional.ofNullable(jwt.getClaimAsMap("realm_access"))
-                        .map(r -> (Collection<String>) r.get("roles"))
-                        .orElse(Collections.emptyList());
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Collection<String> realmRoles = Optional.ofNullable(jwt.getClaimAsMap("realm_access"))
+                    .map(r -> (Collection<String>) r.get("roles"))
+                    .orElse(Collections.emptyList());
 
-                Collection<String> resourceRoles = Optional.ofNullable(jwt.getClaimAsMap("resource_access"))
-                        .map(r -> (Map<String, Object>) r.get("backend-client"))
-                        .map(r -> (Collection<String>) r.get("roles"))
-                        .orElse(Collections.emptyList());
+            Collection<String> resourceRoles = Optional.ofNullable(jwt.getClaimAsMap("resource_access"))
+                    .map(r -> (Map<String, Object>) r.get("backend-client"))
+                    .map(r -> (Collection<String>) r.get("roles"))
+                    .orElse(Collections.emptyList());
 
-                return Stream.concat(realmRoles.stream(), resourceRoles.stream())
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                        .collect(Collectors.toSet());
-            }
+            return Stream.concat(realmRoles.stream(), resourceRoles.stream())
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                    .collect(Collectors.toSet());
         });
         return converter;
     }
@@ -127,7 +121,7 @@ public class SecurityConfig {
             "https://frontend:5173"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         config.setExposedHeaders(List.of("Authorization", "Content-Type", "Content-Length"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
@@ -138,18 +132,15 @@ public class SecurityConfig {
     }
 
     // =============================
-    // JWT Decoder con Keycloak
+    // JWT Decoder (Keycloak)
     // =============================
     @Bean
     public JwtDecoder jwtDecoder() {
         String jwkSetUri = "http://keycloak:8080/realms/Ecommerce/protocol/openid-connect/certs";
-
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-
-        // Use only default validators to avoid compilation issues
-        // The issuer validation is handled by Spring Security automatically when using withJwkSetUri
-        return decoder;
+        return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
     }
+}
+
 
     // =============================
     // Alternative: Simple Issuer Validator (if needed)
@@ -178,4 +169,3 @@ public class SecurityConfig {
         };
     }
     */
-}

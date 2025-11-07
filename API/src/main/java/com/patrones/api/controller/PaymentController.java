@@ -1,25 +1,20 @@
 package com.patrones.api.controller;
 
 import com.patrones.api.dto.PaymentRequest;
-import com.patrones.api.entity.Payment;
-import com.patrones.api.entity.ClientData;
-import com.patrones.api.repository.PaymentRepository;
-import com.patrones.api.repository.ClientDataRepository;
+import com.patrones.api.dto.PaymentResponse;
 
+import com.patrones.api.entity.ClientData;
+import com.patrones.api.entity.Payment;
+import com.patrones.api.repository.ClientDataRepository;
+import com.patrones.api.repository.PaymentRepository;
+import com.patrones.api.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/payments")
-@CrossOrigin(origins = "*")
 public class PaymentController {
 
     @Autowired
@@ -28,89 +23,57 @@ public class PaymentController {
     @Autowired
     private ClientDataRepository clientDataRepository;
 
-    @PostMapping
-    public ResponseEntity<?> createPayment(
-            @RequestBody PaymentRequest request,
-            @AuthenticationPrincipal Jwt jwt) {
+    @Autowired
+    private PaymentService paymentService;
 
-        try {
-            String uid = jwt.getClaimAsString("sub");
-
-            // Validaciones básicas
-            if (request.getAmount() == null || request.getCurrency() == null) {
-                return ResponseEntity.badRequest().body("Amount and currency are required");
-            }
-
-            if (request.getAmount() <= 0) {
-                return ResponseEntity.badRequest().body("Amount must be greater than 0");
-            }
-
-            // Procesar tarjeta (extraer primeros 6 y últimos 4 dígitos)
-            String first6 = null;
-            String last4 = null;
-            
-            if (request.getCardNumber() != null && !request.getCardNumber().isBlank()) {
-                String pan = request.getCardNumber().replaceAll("\\s+", "");
-                
-                if (pan.length() >= 10) {
-                    first6 = pan.substring(0, 6);
-                    last4 = pan.substring(pan.length() - 4);
-                } else {
-                    return ResponseEntity.badRequest().body("Invalid card number");
-                }
-            }
-
-            // Buscar ClientData si se proporciona ID
-            ClientData clientData = null;
-            if (request.getClientDataId() != null) {
-                clientData = clientDataRepository.findById(request.getClientDataId()).orElse(null);
-            }
-
-            // Crear y guardar el pago
-            Payment payment = new Payment();
-            payment.setUid(uid);
-            payment.setItems(request.getItems());
-            payment.setAmount(request.getAmount());
-            payment.setCurrency(request.getCurrency().toUpperCase());
-            payment.setDireccion(request.getDireccion());
-            payment.setCardNumberFirst6(first6);
-            payment.setCardNumberLast4(last4);
-            payment.setCardholderName(request.getCardholderName());
-            payment.setPaymentStatus("PENDING");
-            payment.setClientData(clientData);
-
-            Payment savedPayment = paymentRepository.save(payment);
-
-            // Respuesta simple de éxito
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("paymentId", savedPayment.getId());
-            response.put("idCompra", savedPayment.getIdCompra());
-            response.put("status", savedPayment.getPaymentStatus());
-            response.put("message", "Payment created successfully");
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("error", "Error creating payment");
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+    @PostMapping("/process")
+    public PaymentResponse processPayment(@RequestBody PaymentRequest request) {
+        return paymentService.processPayment(request);
     }
 
-    @GetMapping
-    public ResponseEntity<?> getMyPayments(@AuthenticationPrincipal Jwt jwt) {
-        try {
-            String uid = jwt.getClaimAsString("sub");
-            List<Payment> payments = paymentRepository.findByUid(uid);
-            return ResponseEntity.ok(payments);
-        } catch (Exception ex) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("error", "Error retrieving payments");
-            return ResponseEntity.status(500).body(errorResponse);
+
+    @PostMapping("/save")
+    public Payment savePayment(@RequestBody PaymentRequest request) {
+        Payment payment = new Payment();
+
+        String transactionId = UUID.randomUUID().toString();
+        payment.setTransactionId(transactionId);
+        payment.setStatus("AUTHORIZED");
+        payment.setToken("tok_" + UUID.randomUUID());
+
+        // Información de tarjeta
+        if (request.getCardNumber() != null && request.getCardNumber().length() >= 6) {
+            payment.setCardBin(request.getCardNumber().substring(0, 6));
+            payment.setCardLast4(request.getCardNumber()
+                    .substring(request.getCardNumber().length() - 4));
         }
+
+        payment.setCardholderName(request.getCardholderName());
+        payment.setExpiryMonth(request.getExpiryMonth());
+        payment.setExpiryYear(request.getExpiryYear());
+
+        // Datos del cliente
+        if (request.getClientDataId() != null) {
+            ClientData clientData = clientDataRepository.findById(request.getClientDataId())
+                    .orElse(null);
+            if (clientData != null) {
+                payment.setClientDataId(clientData.getId());
+            }
+        }
+
+        payment.setAmount(request.getAmount());
+        payment.setCurrency(request.getCurrency());
+        payment.setItems(request.getItems());
+        payment.setDireccion(request.getDireccion());
+        payment.setUsedCoupon(request.isUsedCoupon());
+
+        Payment savedPayment = paymentRepository.save(payment);
+        return savedPayment;
+    }
+
+    @GetMapping("/{transactionId}")
+    public Payment getPayment(@PathVariable String transactionId) {
+        return paymentRepository.findByTransactionId(transactionId)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
     }
 }
