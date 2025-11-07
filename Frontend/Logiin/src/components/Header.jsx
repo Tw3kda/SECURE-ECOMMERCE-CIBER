@@ -1,128 +1,107 @@
-// src/components/Header.jsx
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { ShoppingBag, User, LogOut } from "lucide-react";
+import CartDrawer from "./ui/cartDrawer";
 
-export default function Header({
-  title,
-  userData,
-  isUserAdmin,
-  loading,
-  onRefresh,
-  onLogout,
-}) {
+export default function Header() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    console.log("Cerrando sesión...");
+    setIsMenuOpen(false);
+  };
+
+  const handleViewProfile = () => {
+    console.log("Viendo perfil...");
+    setIsMenuOpen(false);
+  };
+
   return (
-    <div style={styles.header}>
-      <div style={styles.headerContent}>
-        <h1 style={styles.title}>
-          {isUserAdmin ? "🛠️ Panel de Administración" : "🛍️ Tienda Virtual"}
-        </h1>
-        <div style={styles.userInfo}>
-          <span style={styles.welcomeText}>Hola, {userData?.name}</span>
-          <div style={styles.userBadges}>
-            {userData?.roles?.map((role, index) => (
-              <span
-                key={index}
-                style={{
-                  ...styles.roleBadge,
-                  ...(role === "admin"
-                    ? styles.adminBadge
-                    : styles.userBadge),
-                }}
-              >
-                {role}
-                {role === "admin" && " 👑"}
-              </span>
-            ))}
+    <nav className="sticky top-0 z-50 border-b bg-white/70 backdrop-bl supports-[backdrop-filter]:bg-white/60 shadow-sm">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          {/* Logo y nombre */}
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <ShoppingBag className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                Arepa Sunshine
+              </h1>
+              <p className="text-xs text-yellow-600 font-medium">
+                Corner Shop Delights
+              </p>
+            </div>
           </div>
+          
+          {/* Navegación y controles */}
+          <div className="flex items-center gap-6">
+            {/* Enlaces de navegación */}
+            <a href="#productos" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors duration-200">
+              Productos
+            </a>
+            <a href="#nosotros" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors duration-200">
+              Nosotros
+            </a>
+            <a href="#contacto" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors duration-200">
+              Contacto
+            </a>
 
-          <button
-            style={styles.refreshBtn}
-            onClick={onRefresh}
-            disabled={loading}
-          >
-            {loading ? "🔄 Cargando..." : "🔄 Recargar"}
-          </button>
+            {/* Carrito */}
+            <CartDrawer />
 
-          <button style={styles.logoutBtn} onClick={onLogout}>
-            Cerrar Sesión
-          </button>
+            {/* Icono de usuario */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-yellow-100 transition-colors duration-200 border-2 border-gray-200 hover:border-yellow-300"
+              >
+                <User className="h-5 w-5 text-gray-600 hover:text-yellow-600" />
+              </button>
+
+              {/* Menú desplegable */}
+              {isMenuOpen && (
+                <div className="absolute right-0 top-12 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-40">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-white to-yellow-50 rounded-t-xl">
+                    <p className="text-sm font-semibold text-gray-900">Mi Cuenta</p>
+                    <p className="text-xs text-gray-500">usuario@ejemplo.com</p>
+                  </div>
+
+                  <button
+                    onClick={handleViewProfile}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-yellow-50 transition-colors duration-200"
+                  >
+                    <User className="h-4 w-4 text-yellow-600" />
+                    Ver Perfil
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Cerrar Sesión
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </nav>
   );
 }
-
-const styles = {
-  header: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "4rem",
-    backgroundColor: "#3b82f6",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.15)",
-    zIndex: 1000,
-    display: "flex",
-    alignItems: "center",
-  },
-  headerContent: {
-    maxWidth: "1200px",
-    margin: "0 auto",
-    padding: "0 1.5rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    color: "white",
-  },
-  title: {
-    margin: 0,
-    fontSize: "1.25rem",
-    fontWeight: "bold",
-    color: "white",
-  },
-  userInfo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "1rem",
-  },
-  welcomeText: {
-    fontWeight: "bold",
-    color: "white",
-  },
-  userBadges: {
-    display: "flex",
-    gap: "0.5rem",
-  },
-  roleBadge: {
-    padding: "0.25rem 0.75rem",
-    borderRadius: "1rem",
-    fontSize: "0.75rem",
-    fontWeight: "bold",
-  },
-  adminBadge: {
-    backgroundColor: "#dc2626",
-    color: "white",
-  },
-  userBadge: {
-    backgroundColor: "#16a34a",
-    color: "white",
-  },
-  refreshBtn: {
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    color: "white",
-    border: "1px solid rgba(255,255,255,0.3)",
-    padding: "0.5rem 1rem",
-    borderRadius: "0.5rem",
-    cursor: "pointer",
-    fontWeight: "500",
-  },
-  logoutBtn: {
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    color: "white",
-    border: "1px solid rgba(255,255,255,0.3)",
-    padding: "0.5rem 1rem",
-    borderRadius: "0.5rem",
-    cursor: "pointer",
-    fontWeight: "500",
-  },
-};

@@ -176,6 +176,25 @@ public ResponseEntity<?> createProduct(
     }
 
     // -----------------------------
+    // Eliminar comentario
+    // -----------------------------
+    @DeleteMapping("/comments/{commentId}")
+    @PreAuthorize("hasRole('admin')")
+    public ResponseEntity<?> deleteComment(@PathVariable Long commentId) {
+        try {
+            Comment comment = commentRepository.findById(commentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentario no encontrado"));
+            
+            commentRepository.delete(comment);
+            return ResponseEntity.ok().build();
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al eliminar el comentario");
+        }
+    }
+
+    // -----------------------------
     // Clase interna para requests de comentario
     // -----------------------------
     public static class CommentRequest {

@@ -3,7 +3,6 @@ import { getKeycloak } from "../../keycloak";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/Header";
 import ProductCard from "../../components/ProductCard";
-import Container from "../../components/container.jsx";
 
 export default function Dashboard() {
   const [userData, setUserData] = useState(null);
@@ -36,7 +35,6 @@ export default function Dashboard() {
         keycloak.token.substring(0, 50) + "..."
       );
 
-      // Use debug version from start
       fetchProductsWithImages(keycloak.token);
     } else {
       console.warn("⚠️ User not authenticated in Keycloak.");
@@ -72,12 +70,12 @@ export default function Dashboard() {
         const data = await response.json();
         console.log(`✅ ${data.length} products received from backend:`, data);
 
-        // Process each product and debug image fetches
         const processedProducts = await Promise.all(
           data.map(async (product) => {
             console.log("🧩 Product details:", product);
 
-            const hasImageData = product.imageName && product.imageType;
+            // el DTO expone `hasImage` e `imageType` (no siempre imageName)
+            const hasImageData = product.hasImage && product.imageType;
 
             if (!hasImageData) {
               console.log(`⏭️ Product ${product.id} has no image data`);
@@ -89,20 +87,15 @@ export default function Dashboard() {
             }
 
             try {
-              console.log(
-                `🖼️ Fetching image for product ${product.id} (${product.imageName})`
-              );
+              console.log(`🖼️ Fetching image for product ${product.id}`);
 
-              const imageResponse = await fetch(
-                `https://localhost:9444/api/products/${product.id}/image`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "*/*",
-                  },
-                  mode: "cors",
-                }
-              );
+              const imageResponse = await fetch(`https://localhost:9444/api/products/${product.id}/image`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "*/*",
+                },
+                mode: "cors",
+              });
 
               console.log(
                 `📡 Image response for product ${product.id}: ${imageResponse.status} ${imageResponse.statusText}`
@@ -138,7 +131,6 @@ export default function Dashboard() {
               );
             }
 
-            // Default if no image fetched
             return {
               ...product,
               imageUrl: "/placeholder-image.jpg",
@@ -167,7 +159,6 @@ export default function Dashboard() {
     }
   };
 
-  // Clean up created object URLs
   useEffect(() => {
     return () => {
       products.forEach((product) => {
@@ -187,20 +178,55 @@ export default function Dashboard() {
     if (!isUserAdmin) return;
     console.log("🗑️ Delete review for product:", productId);
   };
+  
+  // Actualizar estado de productos cuando se agrega o elimina un comentario
+  const handleCommentAdded = (productId, newComment) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, comments: [ ...(p.comments || []), newComment ] } : p));
+  };
+
+  const handleCommentRemoved = (productId, commentId) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, comments: (p.comments || []).filter(c => c.id !== commentId) } : p));
+  };
   const handleCreateProduct = () => {
     if (isUserAdmin) navigate("/CreateProduct");
   };
 
   if (!userData) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-600">
+      <div 
+        className="min-h-screen flex items-center justify-center text-gray-600"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,255,224,0.8) 0%, rgba(255,255,200,0.6) 50%, rgba(255,255,180,0.4) 100%)",
+          backdropFilter: "blur(10px)"
+        }}
+      >
         <h2>Cargando información del usuario...</h2>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-blue-300 to-purple-500 flex flex-col">
+    <div 
+      className="min-h-screen"
+      style={{
+        background: "linear-gradient(135deg, rgba(255,255,224,0.8) 0%, rgba(255,255,200,0.6) 50%, rgba(255,255,180,0.4) 100%)",
+        backdropFilter: "blur(15px)",
+        position: "relative"
+      }}
+    >
+      {/* Fondo adicional para mejorar el efecto difuminado */}
+      <div 
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "radial-gradient(circle at 30% 70%, rgba(255,255,150,0.3) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(255,255,180,0.2) 0%, transparent 50%)",
+          zIndex: -1
+        }}
+      />
+      
       <Header
         userData={userData}
         isUserAdmin={isUserAdmin}
@@ -209,20 +235,31 @@ export default function Dashboard() {
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 flex justify-center items-start py-10 px-4">
-        <Container>
-          <h2 className="text-3xl font-bold text-gray-800 mb-6">
-            {isUserAdmin ? "Panel de Administración" : "Catálogo de Productos"}
-          </h2>
+      <main className="w-full py-16 px-4 relative z-10">
+        {/* Hero Section */}
+        <div className="max-w-7xl mx-auto text-center mb-16">
+          <div className="inline-flex items-center gap-2 bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+            <span>☀️</span>
+            <span>Auténtico Sabor Arepense</span>
+          </div>
+          
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-4">
+            Arepas Artesanales
+          </h1>
+          
+          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
+            Deliciosas arepas hechas a mano con amor. Disfruta el auténtico sabor de Arepabuelas en cada bocado.
+          </p>
 
-          <div className="flex flex-wrap justify-center gap-4 mb-8">
+          {/* Botones de acción */}
+          <div className="flex flex-wrap justify-center gap-4">
             <button
               onClick={handleCreateProduct}
               disabled={!isUserAdmin}
-              className={`px-5 py-2 rounded-xl text-white text-sm font-medium transition ${
+              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md ${
                 isUserAdmin
-                  ? "bg-blue-500 hover:bg-blue-600"
-                  : "bg-gray-300 cursor-not-allowed"
+                  ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 hover:shadow-lg hover:scale-105"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
               ➕ Crear Nuevo Producto
@@ -231,42 +268,63 @@ export default function Dashboard() {
             <button
               onClick={handleRefreshProducts}
               disabled={loading}
-              className={`px-5 py-2 rounded-xl text-white text-sm font-medium transition ${
+              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md ${
                 loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-white text-gray-800 border-2 border-gray-300 hover:border-yellow-400 hover:shadow-lg"
               }`}
             >
               {loading ? "🔄 Cargando..." : "🔄 Actualizar"}
             </button>
           </div>
+        </div>
+
+        {/* Sección de productos */}
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-4xl font-bold text-center text-gray-900 mb-3">
+            Nuestros Productos
+          </h2>
+          <div className="w-24 h-1 bg-yellow-400 mx-auto mb-12"></div>
 
           {loading ? (
-            <p className="text-center text-gray-500">Cargando productos...</p>
+            <p className="text-center text-gray-500 text-lg py-12">
+              Cargando productos...
+            </p>
           ) : products.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {products.map((product) => (
                 <ProductCard
                   key={product.id}
+                  productId={product.id}
                   image={product.imageUrl}
                   name={product.name}
                   description={product.description}
                   price={product.price}
                   rating={product.rating || 4.5}
+                  reviewCount={product.reviewCount || 0}
                   commentCount={product.comments?.length || 0}
+                  initialComments={product.comments || []}
+                  onCommentAdded={handleCommentAdded}
+                  onCommentRemoved={handleCommentRemoved}
                   onViewReviews={() => handleDeleteReview(product.id)}
+                  isAdmin={isUserAdmin}
                 />
               ))}
             </div>
           ) : (
-            <div className="text-center text-gray-500">
-              <p className="text-lg">No hay productos disponibles.</p>
-              <p className="text-sm mt-1">
-                Usa los botones de arriba para crear o recargar.
+            <div className="text-center py-20">
+              <div className="mb-6 text-6xl">🍽️</div>
+              <p className="text-xl text-gray-600 mb-2">
+                No hay productos disponibles
+              </p>
+              <p className="text-sm text-gray-500">
+                {isUserAdmin
+                  ? "Crea tu primer producto usando el botón de arriba"
+                  : "Vuelve pronto para ver nuestras deliciosas arepas"}
               </p>
             </div>
           )}
-        </Container>
+        </div>
       </main>
     </div>
   );
