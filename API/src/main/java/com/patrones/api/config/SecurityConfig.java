@@ -32,7 +32,7 @@ public class SecurityConfig {
             "/test", "/api/test",
             "/health", "/actuator/health",
             "/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**",
-            "/error", "/favicon.ico", "/public/**"
+            "/error", "/favicon.ico", "/public/**", "api/test/**"
     };
 
     // ----------------------------
@@ -128,7 +128,7 @@ public class SecurityConfig {
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
-        config.setExposedHeaders(List.of("Authorization"));
+        config.setExposedHeaders(List.of("Authorization", "Content-Type", "Content-Length"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

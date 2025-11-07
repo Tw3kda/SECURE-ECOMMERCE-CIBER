@@ -34,7 +34,6 @@ public class Product {
     @Column(name = "image_type", length = 100)
     private String imageType;
     
-    @Lob
     @Column(name = "image_data", columnDefinition = "bytea")
     private byte[] imageData;
     

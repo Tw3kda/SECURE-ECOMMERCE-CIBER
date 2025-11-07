@@ -38,45 +38,59 @@ public class ProductController {
     // -----------------------------
     // Crear producto
     // -----------------------------
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('admin')")
-    public ResponseEntity<?> createProduct(
-            @RequestParam String name,
-            @RequestParam String description,
-            @RequestParam Double price,
-            @RequestParam(value = "image", required = false) MultipartFile imageFile) {
+   // Crear producto
+// -----------------------------
+@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+@PreAuthorize("hasRole('admin')")
+public ResponseEntity<?> createProduct(
+        @RequestParam String name,
+        @RequestParam String description,
+        @RequestParam Double price,
+        @RequestParam(value = "image", required = false) MultipartFile imageFile) {
 
-        try {
-            if (name.isBlank() || description.isBlank() || price == null || price <= 0) {
-                return ResponseEntity.badRequest().body("Campos inválidos: name, description o price");
-            }
+    try {
+        // DEBUG: Print received data
+        System.out.println("=== DEBUG: CREATE PRODUCT REQUEST ===");
+        System.out.println("Name: " + name);
+        System.out.println("Description: " + description);
+        System.out.println("Price: " + price);
+        System.out.println("Image file: " + (imageFile != null ? imageFile.getOriginalFilename() : "null"));
+        System.out.println("Image size: " + (imageFile != null ? imageFile.getSize() + " bytes" : "null"));
+        System.out.println("Image content type: " + (imageFile != null ? imageFile.getContentType() : "null"));
+        System.out.println("=====================================");
 
-            Product product = new Product();
-            product.setName(name.trim());
-            product.setDescription(description.trim());
-            product.setPrice(price);
-
-            // Validar y escanear imagen si existe
-            if (imageFile != null && !imageFile.isEmpty()) {
-                imageValidationService.validateImage(imageFile);
-                product.setImageName(imageFile.getOriginalFilename());
-                product.setImageType(imageFile.getContentType());
-                product.setImageData(imageFile.getBytes());
-            }
-
-            Product savedProduct = productRepository.save(product);
-            return ResponseEntity.ok(convertToDTO(savedProduct));
-
-        } catch (ResponseStatusException e) {
-            // Captura errores de validación de imagen (tipo, tamaño, virus)
-            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
-        } catch (IOException e) {
-            return ResponseEntity.badRequest().body("⚠️ Error al procesar la imagen");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("⚠️ Error al crear el producto");
+        if (name.isBlank() || description.isBlank() || price == null || price <= 0) {
+            return ResponseEntity.badRequest().body("Campos inválidos: name, description o price");
         }
+
+        Product product = new Product();
+        product.setName(name.trim());
+        product.setDescription(description.trim());
+        product.setPrice(price);
+
+        // Validar y escanear imagen si existe
+        if (imageFile != null && !imageFile.isEmpty()) {
+            imageValidationService.validateImage(imageFile);
+            product.setImageName(imageFile.getOriginalFilename());
+            product.setImageType(imageFile.getContentType());
+            product.setImageData(imageFile.getBytes());
+        }
+
+        Product savedProduct = productRepository.save(product);
+        return ResponseEntity.ok(convertToDTO(savedProduct));
+
+    } catch (ResponseStatusException e) {
+        // Captura errores de validación de imagen (tipo, tamaño, virus)
+          
+        return ResponseEntity.status(e.getStatusCode()).body(e.getReason() + "HOLO");
+      
+    } catch (IOException e) {
+        return ResponseEntity.badRequest().body("⚠️ Error al procesar la imagen");
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.badRequest().body("⚠️ Error al crear el producto");
     }
+}
 
     // -----------------------------
     // Obtener todos los productos
