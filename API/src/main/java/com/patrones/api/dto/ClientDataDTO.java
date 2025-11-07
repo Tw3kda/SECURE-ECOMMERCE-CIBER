@@ -3,7 +3,8 @@ package com.patrones.api.dto;
 public class ClientDataDTO {
     private Long id;
     private String uid;
-    private byte[] imagen;
+    private String correo;       // <-- nuevo campo
+    private byte[] imagen;       // <-- imagen opcional
     private boolean usoCodigoDescuento;
 
     public ClientDataDTO() {}
@@ -14,6 +15,9 @@ public class ClientDataDTO {
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }
+
+    public String getCorreo() { return correo; }
+    public void setCorreo(String correo) { this.correo = correo; }
 
     public byte[] getImagen() { return imagen; }
     public void setImagen(byte[] imagen) { this.imagen = imagen; }

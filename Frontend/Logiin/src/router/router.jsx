@@ -3,6 +3,7 @@ import Home from "../pages/public/Home.jsx";
 import Login from "../pages/public/Login.jsx";
 import Signup from "../pages/public/Signup.jsx";
 import Dashboard from "../pages/private/Dashboard.jsx";
+import PaymentModule from "../pages/private/PaymentModule.jsx";
 import CreateProduct from "../pages/private/CreateProduct.jsx";
 import ProtectedRoutes from "./protectedRoutes.jsx";
 import PublicRoute from "./PublicRoute.jsx";
@@ -45,6 +46,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoutes>
         <CreateProduct />
+      </ProtectedRoutes>
+    ),
+  },
+   {
+    path: "/PaymentModule",
+    element: (
+      <ProtectedRoutes>
+        <PaymentModule />
       </ProtectedRoutes>
     ),
   },

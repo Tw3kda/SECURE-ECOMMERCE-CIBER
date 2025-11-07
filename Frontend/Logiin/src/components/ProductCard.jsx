@@ -255,7 +255,7 @@ const ProductCard = ({
         )}
         
         {/* Badge de precio flotante - Esquina superior derecha */}
-        <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-base font-bold shadow-lg">
+        <div className="absolute top-2 right-2 bg-white text-primary-foreground px-3 py-1.5 rounded-full text-base font-bold shadow-lg">
           ${typeof price === 'number' ? price.toFixed(2) : '0.00'}
         </div>
         

@@ -28,32 +28,34 @@ public class ClientDataController {
     private ImageValidationService imageValidationService;
 
     /**
-     * 📤 Crear nuevo registro de cliente con imagen validada
+     * 📤 Crear nuevo registro de cliente con imagen opcional y correo
      */
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<?> createClientData(
-            @RequestPart("imagen") MultipartFile imagen,
+            @RequestPart("correo") String correo,
+            @RequestPart(value = "imagen", required = false) MultipartFile imagen,
             @RequestPart("usoCodigoDescuento") boolean usoCodigoDescuento,
             @AuthenticationPrincipal Jwt jwt) {
 
         try {
             String uid = jwt.getClaimAsString("sub");
 
-            // ✅ Validar con ClamAV
-            imageValidationService.validateImage(imagen);
-
-            // Convertir imagen a bytes
-            byte[] imageBytes = imagen.getBytes();
+            byte[] imageBytes = null;
+            if (imagen != null && !imagen.isEmpty()) {
+                // ✅ Validar con ClamAV
+                imageValidationService.validateImage(imagen);
+                imageBytes = imagen.getBytes();
+            }
 
             // Guardar en DB
             ClientData entity = new ClientData();
             entity.setUid(uid);
-            entity.setImagen(imageBytes);
+            entity.setCorreo(correo);
+            entity.setImagen(imageBytes); // puede ser null
             entity.setUsoCodigoDescuento(usoCodigoDescuento);
 
             ClientData saved = clientDataRepository.save(entity);
 
-            // Convertir a DTO
             return ResponseEntity.ok(convertToDTO(saved));
 
         } catch (IOException e) {
@@ -65,51 +67,28 @@ public class ClientDataController {
     }
 
     /**
-     * 🔍 Obtener todos los registros del usuario autenticado
+     * 🔍 Obtener los datos de un cliente por UID
      */
-    @GetMapping
-    public ResponseEntity<List<ClientDataDTO>> getMyClientData(@AuthenticationPrincipal Jwt jwt) {
-        String uid = jwt.getClaimAsString("sub");
-        List<ClientDataDTO> list = clientDataRepository.findByUid(uid)
-                .stream()
+    @GetMapping("/{uid}")
+    public ResponseEntity<?> getClientDataByUid(@PathVariable String uid) {
+        List<ClientData> list = clientDataRepository.findByUid(uid);
+        if (list.isEmpty()) return ResponseEntity.notFound().build();
+
+        List<ClientDataDTO> dtos = list.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+
+        return ResponseEntity.ok(dtos);
     }
 
-    /**
-     * 📥 Descargar la imagen guardada (como archivo)
-     */
-    @GetMapping("/{id}/imagen")
-    public ResponseEntity<byte[]> getClientImage(
-            @PathVariable Long id,
-            @AuthenticationPrincipal Jwt jwt) {
-
-        String uid = jwt.getClaimAsString("sub");
-        ClientData entity = clientDataRepository.findByIdAndUid(id, uid).orElse(null);
-
-        if (entity == null || entity.getImagen() == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        byte[] imageBytes = entity.getImagen();
-
-        // 🔧 Cabeceras de respuesta
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.IMAGE_JPEG); // o IMAGE_PNG si lo prefieres
-        headers.setContentLength(imageBytes.length);
-        headers.setContentDisposition(
-                ContentDisposition.builder("inline").filename("imagen_" + id + ".jpg").build()
-        );
-
-        return new ResponseEntity<>(imageBytes, headers, HttpStatus.OK);
-    }
+   
 
     private ClientDataDTO convertToDTO(ClientData entity) {
         ClientDataDTO dto = new ClientDataDTO();
         dto.setId(entity.getId());
         dto.setUid(entity.getUid());
-        dto.setImagen(entity.getImagen());
+        dto.setCorreo(entity.getCorreo()); // <-- correo incluido
+        dto.setImagen(entity.getImagen()); // opcional
         dto.setUsoCodigoDescuento(entity.isUsoCodigoDescuento());
         return dto;
     }

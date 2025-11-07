@@ -1,13 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import { X, Plus, Minus, ShoppingBag, Trash2 } from "lucide-react";
-import { useCart } from "../../context/CartContext";
-
 import { useNavigate } from "react-router-dom";
+import { useCart } from "../../context/CartContext";
+import { getKeycloak } from "../../keycloak";
 
 const CartDrawer = () => {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const { cart, removeFromCart, updateQuantity, getCartTotal, clearCart } =
-    useCart();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const { cart, removeFromCart, updateQuantity, getCartTotal, clearCart } = useCart();
+
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardholderName, setCardholderName] = useState("");
+  const [expiryMonth, setExpiryMonth] = useState("");
+  const [expiryYear, setExpiryYear] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const navigate = useNavigate();
+  const keycloak = getKeycloak();
+  const total = getCartTotal();
 
   const handleQuantityChange = (productId, newQuantity) => {
     if (newQuantity < 1) {
@@ -17,20 +28,55 @@ const CartDrawer = () => {
     }
   };
 
-  const navigate = useNavigate();
+  const handlePayment = async () => {
+    if (!cardNumber || !cardholderName || !expiryMonth || !expiryYear) {
+      setMessage("Por favor completa todos los campos de la tarjeta");
+      return;
+    }
 
-  const goToPayment = () => {
-    navigate("/PaymentModule");
-  };
+    setLoading(true);
+    setMessage("");
 
-  const total = getCartTotal();
-
-  // Función para limpiar URLs de blob cuando se cierra el drawer
-  React.useEffect(() => {
-    return () => {
-      // No revocamos las URLs aquí porque se manejan en el Dashboard
+    const requestBody = {
+      cardNumber,
+      cardholderName,
+      expiryMonth,
+      expiryYear,
+      amount: total,
+      currency: "COP",
+      items: JSON.stringify(cart.map((p) => ({ id: p.id, name: p.name, quantity: p.quantity, price: p.price }))),
+      direccion: "Calle Falsa 123",
+      clientDataId: keycloak?.tokenParsed?.sub || null,
+      usedCoupon: false,
     };
-  }, []);
+
+    try {
+      const response = await fetch("/api/payments/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${keycloak?.token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) throw new Error("Error al procesar el pago");
+
+      const data = await response.json();
+      setMessage(`Pago realizado con éxito. ID de transacción: ${data.transactionId}`);
+      clearCart();
+      setIsPaymentOpen(false);
+      setCardNumber("");
+      setCardholderName("");
+      setExpiryMonth("");
+      setExpiryYear("");
+    } catch (err) {
+      console.error(err);
+      setMessage("Ocurrió un error al procesar el pago");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -49,17 +95,18 @@ const CartDrawer = () => {
         )}
       </button>
 
-      {/* Overlay único */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-40 backdrop-blur-sm"
-          role="presentation"
-          aria-label="Cerrar carrito"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+{/* Overlay único */}
+{isOpen && (
+  <div
+    className="fixed inset-0 z-40 backdrop-blur-sm bg-white/10"
+    role="presentation"
+    aria-label="Cerrar carrito"
+    onClick={() => setIsOpen(false)}
+  />
+)}
 
-      {/* Drawer del carrito - DESDE ARRIBA */}
+
+      {/* Drawer del carrito */}
       <div
         className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? "translate-x-0" : "translate-x-full"
@@ -96,11 +143,9 @@ const CartDrawer = () => {
               <div className="p-4 bg-yellow-50 rounded-full mb-4">
                 <ShoppingBag className="h-12 w-12 text-yellow-400" />
               </div>
-              <p className="text-lg font-medium text-gray-600 mb-2">
-                Carrito vacío
-              </p>
+              <p className="text-lg font-medium text-gray-600 mb-2">Carrito vacío</p>
               <p className="text-sm text-center text-gray-500">
-                Agrega deliciosas arepas a tu carrito
+                Agrega productos a tu carrito
               </p>
             </div>
           ) : (
@@ -109,7 +154,6 @@ const CartDrawer = () => {
                 key={item.id}
                 className="flex gap-4 p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200"
               >
-                {/* Imagen del producto - USANDO imageUrl EN LUGAR DE image */}
                 <div className="flex-shrink-0">
                   {item.imageUrl ? (
                     <img
@@ -117,7 +161,6 @@ const CartDrawer = () => {
                       alt={item.name}
                       className="w-16 h-16 object-cover rounded-lg border border-gray-200"
                       onError={(e) => {
-                        // Si la imagen falla, mostrar placeholder
                         e.target.src = "/placeholder-image.jpg";
                         e.target.onerror = null;
                       }}
@@ -129,19 +172,12 @@ const CartDrawer = () => {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 text-sm truncate">
-                    {item.name}
-                  </h3>
-                  <p className="text-yellow-600 font-bold text-lg">
-                    ${item.price.toFixed(2)}
-                  </p>
+                  <h3 className="font-semibold text-gray-900 text-sm truncate">{item.name}</h3>
+                  <p className="text-yellow-600 font-bold text-lg">${item.price.toFixed(2)}</p>
                   <div className="flex items-center gap-3 mt-2">
                     <button
-                      onClick={() =>
-                        handleQuantityChange(item.id, item.quantity - 1)
-                      }
+                      onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                       className="p-1 rounded-lg border border-gray-300 hover:bg-yellow-50 hover:border-yellow-300 transition-colors duration-200"
-                      aria-label={`Disminuir cantidad de ${item.name}`}
                     >
                       <Minus className="h-3 w-3 text-gray-600" />
                     </button>
@@ -149,11 +185,8 @@ const CartDrawer = () => {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() =>
-                        handleQuantityChange(item.id, item.quantity + 1)
-                      }
+                      onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                       className="p-1 rounded-lg border border-gray-300 hover:bg-yellow-50 hover:border-yellow-300 transition-colors duration-200"
-                      aria-label={`Aumentar cantidad de ${item.name}`}
                     >
                       <Plus className="h-3 w-3 text-gray-600" />
                     </button>
@@ -162,7 +195,6 @@ const CartDrawer = () => {
                 <button
                   onClick={() => removeFromCart(item.id)}
                   className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors duration-200 self-end"
-                  aria-label={`Eliminar ${item.name} del carrito`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -177,30 +209,35 @@ const CartDrawer = () => {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <span className="text-sm text-gray-600">Total:</span>
-                <span className="text-2xl font-bold text-yellow-600 block">
-                  ${total.toFixed(2)}
-                </span>
+                <span className="text-2xl font-bold text-yellow-600 block">${total.toFixed(2)}</span>
               </div>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={clearCart}
                 className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors duration-200 font-medium flex items-center justify-center gap-2"
-                aria-label="Limpiar carrito"
               >
                 <Trash2 className="h-4 w-4" />
                 Limpiar
               </button>
-              <button
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 font-bold shadow-lg hover:shadow-xl"
-                aria-label="Comprar ahora"
-              >
-                Comprar Ahora
-              </button>
+<button
+  className="flex-1 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 font-bold shadow-lg hover:shadow-xl"
+  aria-label="Comprar Ahora"
+  onClick={() => {
+    setIsOpen(false); // cerramos el drawer
+    navigate("/PaymentModule"); // redirigimos a la pantalla de pago
+  }}
+>
+  Comprar Ahora
+</button>
+
             </div>
           </div>
         )}
       </div>
+
+
+
     </>
   );
 };
