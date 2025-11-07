@@ -13,7 +13,7 @@ public class ClientData {
     @Column(nullable = false)
     private String uid;
 
-    @Lob
+
     @Column(columnDefinition = "BYTEA")
     private byte[] imagen;
 
