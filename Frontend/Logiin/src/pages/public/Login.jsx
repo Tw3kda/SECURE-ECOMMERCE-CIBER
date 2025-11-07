@@ -253,7 +253,7 @@ const styles = {
   },
   spinner: {
     border: "4px solid #f3f3f3",
-    borderTop: "4px solid #3498db",
+    borderTop: "4px solid #d16720ff",
     borderRadius: "50%",
     width: "40px",
     height: "40px",
@@ -291,7 +291,7 @@ const styles = {
     fontFamily: "monospace",
   },
   copyButton: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#ff4800ff",
     color: "white",
     border: "none",
     padding: "8px 12px",
