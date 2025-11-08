@@ -44,7 +44,7 @@ export default function CreateProductUI({
       <div className="py-8 px-6 max-w-md bg-white bg-opacity-30 rounded-lg shadow-lg backdrop-blur-xl backdrop-filter w-full">
         {/* Botón Volver al Inicio */}
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/dashboard")}
           className="mb-4 flex items-center gap-2 text-gray-800 hover:text-gray-600 font-semibold transition duration-200"
         >
           <svg
@@ -162,7 +162,7 @@ export default function CreateProductUI({
               onChange={onImageChange}
               className="bg-transparent border rounded-lg shadow border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 py-2 px-4 block w-full appearance-none leading-normal file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
             />
-            
+
             {/* Vista previa de la imagen */}
             {imagePreview && (
               <div className="mt-3">

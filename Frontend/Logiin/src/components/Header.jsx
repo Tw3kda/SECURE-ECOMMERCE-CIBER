@@ -105,10 +105,9 @@ export default function Header({ userData, onLogout, onImageUploaded }) {
             <ShoppingBag className="h-6 w-6 text-yellow-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Arepa Sunshine</h1>
-            <p className="text-xs text-yellow-600 font-medium">
-              Corner Shop Delights
-            </p>
+            <h1 className="text-xl font-bold text-gray-900">
+              Arepabuelas de la esquina
+            </h1>
           </div>
         </div>
 

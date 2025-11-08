@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 const PaymentModule = () => {
   const { cart, getCartTotal, clearCart } = useCart();
   const keycloak = getKeycloak();
-  const navigate = useNavigate(); // Hook para navegación
+  const navigate = useNavigate();
 
   const [clientData, setClientData] = useState(null);
   const [useCoupon, setUseCoupon] = useState(false);
@@ -15,13 +15,17 @@ const PaymentModule = () => {
   const [cardholderName, setCardholderName] = useState("");
   const [expiryMonth, setExpiryMonth] = useState("");
   const [expiryYear, setExpiryYear] = useState("");
-  const [ccv, setCcv] = useState(""); // ✅ CCV input
+  const [ccv, setCcv] = useState("");
   const [direccion, setDireccion] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [transactionData, setTransactionData] = useState(null);
 
+  // Calcular totales BASADOS EN SI EL CUPÓN ESTÁ DISPONIBLE
   const total = getCartTotal();
-  const discount = useCoupon ? total * 0.1 : 0;
+  const canUseCoupon = clientData && !clientData.usoCodigoDescuento;
+  const discount = useCoupon && canUseCoupon ? total * 0.1 : 0;
   const totalWithDiscount = total - discount;
 
   // Fetch client data to check coupon state
@@ -45,7 +49,8 @@ const PaymentModule = () => {
           data.usoCodigoDescuento
         );
         setClientData(data);
-        setUseCoupon(data.usoCodigoDescuento || false);
+        // Solo permitir usar cupón si no ha sido usado
+        setUseCoupon(false); // Resetear a false al cargar
       } catch (err) {
         console.error(err);
       }
@@ -53,7 +58,17 @@ const PaymentModule = () => {
     if (keycloak?.tokenParsed?.sub) fetchClientData();
   }, [keycloak]);
 
-  // Handle payment
+  // Redirección automática después del éxito
+  useEffect(() => {
+    if (showSuccessPopup) {
+      const timer = setTimeout(() => {
+        navigate("/dashboard");
+      }, 3000); // 3 segundos antes de redirigir
+
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessPopup, navigate]);
+
   const handlePayment = async () => {
     if (
       !cardNumber ||
@@ -70,14 +85,16 @@ const PaymentModule = () => {
     setLoading(true);
     setMessage("");
 
+    const actuallyUsedCoupon = useCoupon && canUseCoupon;
+
     const requestBody = {
       cardNumber,
       cardholderName,
       expiryMonth,
       expiryYear,
-      ccv, // ✅ Include CCV
+      ccv,
       amount: totalWithDiscount,
-      currency: "USD", // ✅ Auto-set to USD
+      currency: "USD",
       items: JSON.stringify(
         cart.map((p) => ({
           id: p.id,
@@ -88,12 +105,12 @@ const PaymentModule = () => {
       ),
       direccion,
       clientDataId: keycloak?.tokenParsed?.sub || null,
-      usedCoupon: useCoupon,
+      usedCoupon: actuallyUsedCoupon,
     };
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/payments/save`,
+        `${import.meta.env.VITE_API_URL}/api/payments/process`,
         {
           method: "POST",
           headers: {
@@ -105,15 +122,22 @@ const PaymentModule = () => {
       );
 
       if (!response.ok) throw new Error("Error al procesar el pago");
+
       const data = await response.json();
 
-      setMessage(
-        `Pago realizado con éxito. ID de transacción: ${data.transactionId}`
-      );
+      // Guardar datos de la transacción para el popup
+      setTransactionData({
+        transactionId: data.transactionId,
+        amount: totalWithDiscount,
+        items: cart.length,
+      });
+
+      // Mostrar popup de éxito
+      setShowSuccessPopup(true);
       clearCart();
 
-      // Update coupon on backend if used
-      if (useCoupon) {
+      // ✅ Solo actualizar cupón si pago fue exitoso y se seleccionó
+      if (actuallyUsedCoupon) {
         try {
           const updateRes = await fetch(
             `${import.meta.env.VITE_API_URL}/api/client-data/${
@@ -125,8 +149,9 @@ const PaymentModule = () => {
             }
           );
           if (updateRes.ok) {
-            console.log("✅ Cupón actualizado a true correctamente.");
+            console.log("✅ Cupón actualizado correctamente.");
             setClientData((prev) => ({ ...prev, usoCodigoDescuento: true }));
+            setUseCoupon(false);
           }
         } catch (err) {
           console.error("⚠️ Error al actualizar el cupón:", err);
@@ -150,9 +175,64 @@ const PaymentModule = () => {
         backgroundAttachment: "fixed",
       }}
     >
+      {/* Popup de éxito */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-auto transform transition-all duration-300 scale-100">
+            <div className="text-center">
+              {/* Icono de éxito */}
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg
+                  className="w-10 h-10 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                ¡Pago Exitoso!
+              </h2>
+
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <p className="text-gray-600 mb-2">
+                  <strong>ID de Transacción:</strong>{" "}
+                  {transactionData?.transactionId}
+                </p>
+                <p className="text-gray-600 mb-2">
+                  <strong>Total Pagado:</strong> $
+                  {transactionData?.amount?.toFixed(2)}
+                </p>
+                <p className="text-gray-600">
+                  <strong>Productos:</strong> {transactionData?.items} items
+                </p>
+              </div>
+
+              <p className="text-gray-500 text-sm mb-6">
+                Serás redirigido automáticamente al dashboard en 3 segundos...
+              </p>
+
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200"
+              >
+                Volver al Dashboard Ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button
-        onClick={() => navigate("/dashboard")} // Cambia "/dashboard" por tu ruta
-        className="fixed top-4 right-4 z-50 w-10 h-10 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200"
+        onClick={() => navigate("/dashboard")}
+        className="fixed top-4 right-4 z-40 w-10 h-10 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200"
         title="Volver al Dashboard"
       >
         <svg
@@ -182,16 +262,29 @@ const PaymentModule = () => {
               <h2 className="font-semibold">Cupón de descuento</h2>
               {clientData ? (
                 clientData.usoCodigoDescuento ? (
-                  <p className="text-gray-600">Cupón ya utilizado ✅</p>
+                  <div className="mt-2">
+                    <p className="text-gray-600 mb-2">Cupón ya utilizado ✅</p>
+                    <p className="text-sm text-gray-500">
+                      Has utilizado tu cupón de descuento del 10% en una compra
+                      anterior.
+                    </p>
+                  </div>
                 ) : (
-                  <label className="flex items-center gap-2 mt-2">
-                    <input
-                      type="checkbox"
-                      checked={useCoupon}
-                      onChange={(e) => setUseCoupon(e.target.checked)}
-                    />
-                    <span>Usar cupón de 10% de descuento</span>
-                  </label>
+                  <div className="mt-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={useCoupon}
+                        onChange={(e) => setUseCoupon(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <span>Usar cupón de 10% de descuento</span>
+                    </label>
+                    <p className="text-sm text-green-600 mt-1">
+                      ¡Tienes un cupón disponible! Ahorra $
+                      {(total * 0.1).toFixed(2)}
+                    </p>
+                  </div>
                 )
               ) : (
                 <p className="text-gray-500">
@@ -213,13 +306,28 @@ const PaymentModule = () => {
                   </li>
                 ))}
               </ul>
-              {discount > 0 && (
-                <p className="text-green-600 mt-2">
-                  Descuento aplicado: -${discount.toFixed(2)}
+
+              {/* Mostrar descuento solo si está disponible y seleccionado */}
+              {canUseCoupon && useCoupon && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-green-600">
+                    Descuento aplicado: -${discount.toFixed(2)}
+                  </p>
+                  <p className="text-gray-500 line-through">
+                    Total sin descuento: ${total.toFixed(2)}
+                  </p>
+                </div>
+              )}
+
+              {/* Mostrar mensaje si el cupón ya fue usado */}
+              {clientData?.usoCodigoDescuento && (
+                <p className="text-gray-500 mt-2">
+                  Cupón no disponible (ya utilizado)
                 </p>
               )}
+
               <p className="text-xl font-bold mt-2">
-                Total: ${totalWithDiscount.toFixed(2)}
+                Total a pagar: ${totalWithDiscount.toFixed(2)}
               </p>
             </div>
 
@@ -309,7 +417,6 @@ const PaymentModule = () => {
               </div>
             </div>
 
-            {/* Botón de Pago */}
             <button
               onClick={handlePayment}
               disabled={loading}

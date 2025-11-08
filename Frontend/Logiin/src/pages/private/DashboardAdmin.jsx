@@ -4,18 +4,14 @@ import { useNavigate } from "react-router-dom";
 import Header from "../../components/Header";
 import ProductCard from "../../components/ProductCard";
 import ProductModal from "../../components/ProductModal";
-import PaymentsModal from "../../components/PaymentModal";
 
-export default function Dashboard() {
+export default function DashboardAdmin() {
   const [userData, setUserData] = useState(null);
   const [userEmail, setUserEmail] = useState("");
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [payments, setPayments] = useState([]);
-  const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const parseJwt = (token) => {
@@ -32,87 +28,25 @@ export default function Dashboard() {
     const keycloak = getKeycloak();
     if (keycloak.authenticated && keycloak.token) {
       const tokenDecoded = parseJwt(keycloak.token);
-      const roles = tokenDecoded.realm_access?.roles || [];
-      const userIsAdmin = roles.includes("admin");
 
       const user = {
         uid: tokenDecoded.sub,
         name: tokenDecoded.preferred_username || "",
-        roles,
+        roles: tokenDecoded.realm_access?.roles || [],
         token: keycloak.token,
-        isAdmin: userIsAdmin,
+        isAdmin: true,
       };
 
       setUserData(user);
-      setIsUserAdmin(userIsAdmin);
 
       const email = tokenDecoded.email || "";
       setUserEmail(email);
-
-      // Verificar o crear ClientData SOLO PARA USUARIOS (no admins)
-      if (!userIsAdmin) {
-        fetch(`${import.meta.env.VITE_API_URL}/api/client-data/${user.uid}`, {
-          headers: { Authorization: `Bearer ${keycloak.token}` },
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (!data || data.length === 0) {
-              const formData = new FormData();
-              formData.append("correo", email);
-              formData.append("usoCodigoDescuento", false);
-
-              fetch(`${import.meta.env.VITE_API_URL}/api/client-data`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${keycloak.token}` },
-                body: formData,
-              })
-                .then((r) => r.json())
-                .then((created) =>
-                  console.log("✅ ClientData creado:", created)
-                )
-                .catch((err) =>
-                  console.error("❌ Error creando ClientData:", err)
-                );
-            } else {
-              console.log("✅ ClientData ya existe:", data);
-            }
-          })
-          .catch((err) =>
-            console.error("❌ Error verificando ClientData:", err)
-          );
-      }
 
       fetchProductsWithImages(keycloak.token);
     } else {
       console.warn("⚠️ User not authenticated in Keycloak.");
     }
   }, []);
-
-  const handleOpenPaymentsModal = async () => {
-    if (!userData?.token) return;
-
-    try {
-      const url = isUserAdmin
-        ? `${import.meta.env.VITE_API_URL}/api/payments/all`
-        : `${import.meta.env.VITE_API_URL}/api/payments/my`;
-
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${userData.token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!res.ok) throw new Error("Error cargando transferencias");
-
-      const data = await res.json();
-      setPayments(data);
-      setIsPaymentsModalOpen(true);
-    } catch (err) {
-      console.error(err);
-      alert("No se pudieron cargar las transferencias");
-    }
-  };
 
   const fetchProductsWithImages = async (tokenParam = null) => {
     setLoading(true);
@@ -220,7 +154,35 @@ export default function Dashboard() {
   };
 
   const handleCreateProduct = () => {
-    if (isUserAdmin) navigate("/CreateProduct");
+    navigate("/CreateProduct");
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    if (
+      window.confirm("¿Estás seguro de que quieres eliminar este producto?")
+    ) {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/products/${productId}`,
+          {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${userData?.token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          // Eliminar producto del estado local
+          setProducts((prev) => prev.filter((p) => p.id !== productId));
+          console.log("✅ Producto eliminado correctamente");
+        } else {
+          console.error("❌ Error al eliminar producto");
+        }
+      } catch (error) {
+        console.error("❌ Error al eliminar producto:", error);
+      }
+    }
   };
 
   const handleImageUpdated = (updatedData) => {
@@ -247,7 +209,7 @@ export default function Dashboard() {
           backdropFilter: "blur(10px)",
         }}
       >
-        <h2>Cargando información del usuario...</h2>
+        <h2>Cargando información del administrador...</h2>
       </div>
     );
   }
@@ -263,46 +225,51 @@ export default function Dashboard() {
     >
       <Header
         userData={{ ...userData, email: userEmail }}
-        isUserAdmin={isUserAdmin}
+        isUserAdmin={true}
         loading={loading}
         onRefresh={handleRefreshProducts}
         onLogout={handleLogout}
         onImageUpdated={handleImageUpdated}
-        showCart={!isUserAdmin} // ✅ Solo mostrar carrito si NO es admin
+        showCart={false}
       />
 
       <main className="w-full py-16 px-4 relative z-10">
         {/* Hero Section */}
         <div className="max-w-7xl mx-auto text-center mb-16">
           <div className="inline-flex items-center gap-2 bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
-            <span>☀️</span>
-            <span>Auténtico Sabor Arepense</span>
+            <span>⚙️</span>
+            <span>Panel de Administración</span>
           </div>
 
           <div className="flex flex-col items-center mb-4">
+            <img
+              src={
+                userData?.imagen
+                  ? `${import.meta.env.VITE_API_URL}/api/client-data/${
+                      userData.uid
+                    }/image`
+                  : "/placeholder-image.jpg"
+              }
+              alt="Avatar administrador"
+              className="w-20 h-20 rounded-full border-2 border-gray-200 mb-2"
+            />
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-2">
-              Arepas Artesanales
+              Gestión de Productos
             </h1>
             <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-              {isUserAdmin
-                ? "Panel de Administración - Gestión de Productos"
-                : "Deliciosas arepas hechas a mano con amor. Disfruta el auténtico sabor de Arepabuelas en cada bocado."}
+              Administra el catálogo de arepas artesanales. Crea y elimina
+              productos.
             </p>
           </div>
 
-          {/* Botones condicionales según el rol */}
           <div className="flex flex-wrap justify-center gap-4">
-            {/* Botón "Crear Nuevo Producto" - SOLO PARA ADMINS */}
-            {isUserAdmin && (
-              <button
-                onClick={handleCreateProduct}
-                className="px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 hover:shadow-lg hover:scale-105"
-              >
-                ➕ Crear Nuevo Producto
-              </button>
-            )}
+            <button
+              onClick={handleCreateProduct}
+              className="px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 hover:shadow-lg hover:scale-105"
+            >
+              ➕ Crear Nuevo Producto
+            </button>
 
-            {/* Botón "Actualizar" - PARA TODOS */}
             <button
               onClick={handleRefreshProducts}
               disabled={loading}
@@ -315,32 +282,19 @@ export default function Dashboard() {
               {loading ? "🔄 Cargando..." : "🔄 Actualizar"}
             </button>
 
-            {/* Mensaje para usuarios normales sobre compras */}
-            {!isUserAdmin && (
-              <div className="w-full mt-4">
-                <p className="text-sm text-gray-600">
-                  💡 Haz clic en cualquier producto para ver detalles y agregar
-                  al carrito
-                </p>
-              </div>
-            )}
-
-            {/* Mensaje para admins */}
-            {isUserAdmin && (
-              <div className="w-full mt-4">
-                <p className="text-sm text-gray-600">
-                  ⚙️ Modo Administrador: Puedes crear, editar y eliminar
-                  productos
-                </p>
-              </div>
-            )}
+            <div className="w-full mt-4">
+              <p className="text-sm text-gray-600">
+                ⚙️ Modo Administrador: Haz clic en cualquier producto para
+                gestionarlo
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Sección de productos */}
         <div className="max-w-7xl mx-auto">
           <h2 className="text-4xl font-bold text-center text-gray-900 mb-3">
-            {isUserAdmin ? "Gestión de Productos" : "Nuestros Productos"}
+            Catálogo de Productos
           </h2>
           <div className="w-24 h-1 bg-yellow-400 mx-auto mb-12"></div>
 
@@ -369,9 +323,10 @@ export default function Dashboard() {
                     onCommentAdded={handleCommentAdded}
                     onCommentRemoved={handleCommentRemoved}
                     onViewReviews={() => {}}
-                    isAdmin={isUserAdmin}
+                    isAdmin={true}
                     hideDescriptionButton={true}
-                    showCartActions={!isUserAdmin} // ✅ Solo mostrar acciones de carrito si NO es admin
+                    showCartActions={false}
+                    onDeleteProduct={handleDeleteProduct}
                   />
                 </div>
               ))}
@@ -383,31 +338,23 @@ export default function Dashboard() {
                 No hay productos disponibles
               </p>
               <p className="text-sm text-gray-500">
-                {isUserAdmin
-                  ? "Crea tu primer producto usando el botón de arriba"
-                  : "Vuelve pronto para ver nuestras deliciosas arepas"}
+                Crea tu primer producto usando el botón de arriba
               </p>
             </div>
           )}
         </div>
       </main>
 
-      {/* Modal mejorado */}
+      {/* Modal para administrador */}
       {isModalOpen && selectedProduct && (
         <ProductModal
           product={selectedProduct}
-          isAdmin={isUserAdmin}
+          isAdmin={true}
           onClose={handleCloseModal}
           onCommentAdded={handleCommentAdded}
           onCommentRemoved={handleCommentRemoved}
-          showCartActions={!isUserAdmin} // ✅ Solo mostrar acciones de carrito en modal si NO es admin
-        />
-      )}
-
-      {isPaymentsModalOpen && (
-        <PaymentsModal
-          payments={payments}
-          onClose={() => setIsPaymentsModalOpen(false)}
+          showCartActions={false}
+          onDeleteProduct={handleDeleteProduct}
         />
       )}
     </div>

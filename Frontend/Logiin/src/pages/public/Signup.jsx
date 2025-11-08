@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Signup() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -9,11 +11,21 @@ export default function Signup() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setMessage("");
 
+    if (!passwordRegex.test(form.password)) {
+      setMessage(
+        "❌ Password must be at least 8 characters, include uppercase, lowercase, number, and special character."
+      );
+      return;
+    }
+
+    setLoading(true);
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/auth/register`,
@@ -25,7 +37,9 @@ export default function Signup() {
       );
 
       if (response.ok) {
-        setMessage("✅ Registration successful! You can now log in.");
+        setMessage(
+          "✅ Registration successful! Wait for and admin to approve your SignUp."
+        );
       } else {
         const err = await response.text();
         setMessage(`❌ Error: ${err || "Registration failed"}`);
@@ -75,6 +89,18 @@ export default function Signup() {
 
         <button type="submit" disabled={loading} style={styles.button}>
           {loading ? "Registering..." : "Sign Up"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          style={{
+            ...styles.button,
+            background: "#6c757d",
+            marginTop: "0.5rem",
+          }}
+        >
+          Back to Home
         </button>
 
         {message && <p style={styles.message}>{message}</p>}

@@ -105,6 +105,30 @@ public ResponseEntity<?> createProduct(
     }
 
     // -----------------------------
+// Eliminar producto
+// -----------------------------
+@DeleteMapping("/{id}")
+@PreAuthorize("hasRole('admin')")
+public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
+    try {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        // Eliminar primero los comentarios asociados
+        List<Comment> comments = commentRepository.findByProductIdOrderByCreatedAtDesc(id);
+        commentRepository.deleteAll(comments);
+
+        // Eliminar el producto
+        productRepository.delete(product);
+
+        return ResponseEntity.ok().body("Producto eliminado correctamente");
+    } catch (ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
+    } catch (Exception e) {
+        return ResponseEntity.badRequest().body("Error al eliminar el producto");
+    }
+}
+    // -----------------------------
     // Obtener imagen de producto
     // -----------------------------
     @GetMapping("/{id}/image")

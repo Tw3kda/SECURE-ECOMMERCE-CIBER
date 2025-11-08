@@ -49,7 +49,7 @@ export const router = createBrowserRouter([
       </ProtectedRoutes>
     ),
   },
-   {
+  {
     path: "/PaymentModule",
     element: (
       <ProtectedRoutes>

@@ -26,7 +26,7 @@ export default function CreateProduct() {
     const file = e.target.files[0];
     if (file) {
       setImageFile(file);
-      
+
       // Crear preview de la imagen
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -85,7 +85,7 @@ export default function CreateProduct() {
       formData.append("name", product.name);
       formData.append("description", product.description);
       formData.append("price", parseFloat(product.price));
-      
+
       if (imageFile) {
         formData.append("image", imageFile);
         console.log("🖼️ Image file attached:", imageFile.name);
@@ -95,7 +95,7 @@ export default function CreateProduct() {
         name: product.name,
         description: product.description,
         price: product.price,
-        image: imageFile ? imageFile.name : "No image"
+        image: imageFile ? imageFile.name : "No image",
       });
 
       const response = await fetch("https://localhost:9444/api/products", {
@@ -112,20 +112,14 @@ export default function CreateProduct() {
       if (response.ok) {
         const createdProduct = await response.json();
         console.log("✅ Producto creado:", createdProduct);
-        
+
         // Mostrar mensaje de éxito
         alert("✅ Producto creado exitosamente!");
-        
+
         // Limpiar formulario
         setProduct({ name: "", description: "", price: "" });
         setImageFile(null);
         setImagePreview(null);
-        
-        // Redirigir al inicio después de 1 segundo
-        setTimeout(() => {
-          navigate("/");
-        }, 1000);
-        
       } else if (response.status === 403) {
         setError("❌ Acceso denegado: No tienes permisos de administrador");
       } else if (response.status === 401) {

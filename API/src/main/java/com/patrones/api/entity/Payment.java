@@ -1,10 +1,8 @@
 package com.patrones.api.entity;
 
-import java.time.LocalDateTime;
-
-
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
@@ -15,29 +13,45 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "transaction_id", nullable = false, unique = true)
     private String transactionId;
+
+    @Column(nullable = false)
     private String status;
+
+    @Column(nullable = false)
     private String token;
 
-    // Datos de la tarjeta
+    @Column(name = "card_bin", length = 6)
     private String cardBin;
+
+    @Column(name = "card_last4", length = 4)
     private String cardLast4;
 
-    // Datos de la transacción
+    @Column(nullable = false)
     private Double amount;
+
+    @Column(nullable = false, length = 3)
     private String currency;
-    private String items;
+
+    @Column(length = 255)
     private String direccion;
+
+    @Column(length = 255)
+    private String items;
+
+    @Column(name = "used_coupon")
     private boolean usedCoupon;
 
-    // Relación con ClientData (mantener para foreign key)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "client_data_id")
-    private ClientData clientData;
-
-    // UUID de Keycloak (nuevo campo)
-    @Column(name = "client_uid")
+    @Column(name = "client_uid", nullable = false)
     private String clientUid;
 
+    @Column(name = "fecha_pago", nullable = false)
     private LocalDateTime fechaPago;
+
+    @Column(name = "client_data_id")
+    private Long clientDataId;
+
+    @Column(name = "id_compra", nullable = false, unique = true)
+    private Long idCompra;
 }

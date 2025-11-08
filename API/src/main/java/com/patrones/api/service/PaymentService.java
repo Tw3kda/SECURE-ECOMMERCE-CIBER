@@ -4,14 +4,14 @@ import com.patrones.api.dto.PaymentRequest;
 import com.patrones.api.dto.PaymentResponse;
 import com.patrones.api.entity.Payment;
 import com.patrones.api.repository.PaymentRepository;
+import com.patrones.api.repository.ClientDataRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
-
-
 import java.time.LocalDateTime;
-
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class PaymentService {
@@ -19,6 +19,10 @@ public class PaymentService {
     @Autowired
     private PaymentRepository paymentRepository;
 
+    @Autowired
+    private ClientDataRepository clientDataRepository;
+
+    // --- Procesar pago ---
     public PaymentResponse processPayment(PaymentRequest request) {
 
         // --- Prepare masked card info ---
@@ -34,8 +38,15 @@ public class PaymentService {
         String transactionId = "txn_" + UUID.randomUUID();
         String status = "AUTHORIZED";
 
-        // --- Save only safe data in DB ---
+        // --- Generar idCompra aleatorio y único ---
+        Long idCompra;
+        do {
+            idCompra = ThreadLocalRandom.current().nextLong(100000, 999999);
+        } while (paymentRepository.existsByIdCompra(idCompra));
+
+        // --- Crear Payment ---
         Payment payment = new Payment();
+        payment.setIdCompra(idCompra);
         payment.setTransactionId(transactionId);
         payment.setToken(token);
         payment.setStatus(status);
@@ -44,13 +55,25 @@ public class PaymentService {
         payment.setAmount(request.getAmount());
         payment.setCurrency("COP");
         payment.setDireccion(request.getDireccion());
-        payment.setClientUid(request.getClientDataId()); // ✅ Usar clientUid en lugar de clientDataId
+        payment.setClientUid(request.getClientDataId());
         payment.setUsedCoupon(request.isUsedCoupon());
         payment.setFechaPago(LocalDateTime.now());
 
+        // --- Actualizar ClientData si cupón fue usado ---
+        if (request.getClientDataId() != null) {
+            clientDataRepository.findByUid(request.getClientDataId()).ifPresent(clientData -> {
+                if (request.isUsedCoupon() && !clientData.isUsoCodigoDescuento()) {
+                    clientData.setUsoCodigoDescuento(true);
+                    clientDataRepository.save(clientData);
+                    System.out.println("🎉 Cupón activado para cliente: " + clientData.getUid());
+                }
+            });
+        }
+
+        // --- Guardar Payment ---
         paymentRepository.save(payment);
 
-        // --- Build response ---
+        // --- Construir Response ---
         PaymentResponse response = new PaymentResponse();
         response.setTransactionId(transactionId);
         response.setToken(token);
@@ -62,13 +85,21 @@ public class PaymentService {
         response.setUsedCoupon(request.isUsedCoupon());
         response.setClientDataId(request.getClientDataId());
 
-        // Log para debugging
-        System.out.println("✅ Pago procesado exitosamente");
-        System.out.println("📧 Transaction ID: " + transactionId);
-        System.out.println("👤 Cliente UID: " + request.getClientDataId());
-        System.out.println("💵 Monto: " + request.getAmount());
-        System.out.println("🎫 Cupón usado: " + request.isUsedCoupon());
+        System.out.println("✅ Pago procesado exitosamente: " + transactionId);
 
         return response;
     }
+
+    // --- Obtener Payment por transactionId ---
+    public Payment getPaymentByTransactionId(String transactionId) {
+        return paymentRepository.findByTransactionId(transactionId)
+                .orElseThrow(() -> new RuntimeException("Payment not found"));
+    }
+
+    // --- Obtener todos los Payments ---
+    public List<Payment> getAllPayments() {
+        return paymentRepository.findAll();
+    }
+
+    
 }
