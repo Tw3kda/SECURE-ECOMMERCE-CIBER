@@ -19,16 +19,13 @@ public class Payment {
     // Datos de la tarjeta (solo lo necesario para auditoría segura)
     private String cardBin;        // Primeros 6 dígitos
     private String cardLast4;      // Últimos 4 dígitos
-    private String cardholderName; // Nombre del titular
-    private String expiryMonth;    // <-- String para evitar errores (ej. "03")
-    private String expiryYear;     // <-- String para evitar errores (ej. "2025")
 
     // Datos de la transacción
     private Double amount;
     private String currency;
     private String items;
     private String direccion;
-    private Long clientDataId;
+    private String clientDataId; // ✅ String para UUID de Keycloak
 
-    private boolean usedCoupon; // Nuevo campo
+    private boolean usedCoupon;
 }

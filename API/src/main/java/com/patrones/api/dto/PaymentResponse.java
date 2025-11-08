@@ -5,12 +5,12 @@ import lombok.Data;
 @Data
 public class PaymentResponse {
     private String transactionId;
-    private String status;
     private String token;
-    private String cardBin; // first 6
-    private String cardLast4; // last 4
-    private String cardholderName;
-    private String expiryMonth;
-    private String expiryYear;
+    private String cardBin;
+    private String cardLast4;
+    private String status;
+    private Double amount;
+    private String currency;
     private boolean usedCoupon;
+    private String clientDataId; // ✅ String para UUID
 }

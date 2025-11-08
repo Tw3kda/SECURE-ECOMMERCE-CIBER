@@ -40,7 +40,7 @@ public class SecurityConfig {
     private static final String[] PRODUCT_READ_PATHS = {"/api/products", "/api/products/**"};
     private static final String[] PRODUCT_WRITE_PATHS = {"/api/products/*/comments"};
     private static final String[] PRODUCT_ADMIN_PATHS = {"/api/products"}; // POST → crear productos
-    private static final String[] CLIENTDATA_PATHS = {"/api/clientdata", "/api/clientdata/**"};
+    private static final String[] CLIENTDATA_PATHS = {"/api/client-data", "/api/client-data/**"};
     private static final String[] PAYMENT_PATHS = {"/api/payments", "/api/payments/**"};
 
     // =============================
@@ -70,6 +70,8 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CORS preflight
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/**").permitAll()
                 .requestMatchers(PRODUCT_READ_PATHS).authenticated()
                 .requestMatchers(PRODUCT_WRITE_PATHS).authenticated()
                 .requestMatchers(PRODUCT_ADMIN_PATHS).hasRole("admin")
@@ -120,7 +122,7 @@ public class SecurityConfig {
             "http://frontend:5173",
             "https://frontend:5173"
         ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With"));
         config.setExposedHeaders(List.of("Authorization", "Content-Type", "Content-Length"));
         config.setAllowCredentials(true);

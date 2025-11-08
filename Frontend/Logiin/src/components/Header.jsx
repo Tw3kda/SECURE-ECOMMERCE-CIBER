@@ -1,56 +1,100 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ShoppingBag, User, LogOut } from "lucide-react";
-import CartDrawer from "./ui/cartDrawer";
+import CartDrawer from "./ui/CartDrawer";
+import { getKeycloak } from "../keycloak";
 
-export default function Header({ userData, onLogout, onImageUpdated }) {
+export default function Header({ userData, onLogout, onImageUploaded }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const menuRef = useRef(null);
+  const [profileImageUrl, setProfileImageUrl] = useState(
+    "/placeholder-image.jpg"
+  );
 
+  const menuRef = useRef(null);
+  const keycloak = getKeycloak();
+  const token = keycloak?.token || sessionStorage.getItem("kc_token");
+
+  // Cerrar el menú si se hace clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
+  // Cargar imagen protegida
+  useEffect(() => {
+    if (userData?.uid && token) {
+      loadProtectedImage();
+    }
+  }, [userData]);
 
+  const loadProtectedImage = async () => {
+    const imageUrl = `${import.meta.env.VITE_API_URL}/api/client-data/${
+      userData.uid
+    }/image`;
+    try {
+      const res = await fetch(imageUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("No se pudo cargar la imagen");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setProfileImageUrl(blobUrl);
+      console.log("🖼️ Imagen cargada correctamente");
+    } catch (error) {
+      console.warn(
+        "⚠️ No se pudo mostrar la imagen, usando placeholder:",
+        error
+      );
+      setProfileImageUrl("/placeholder-image.jpg");
+    }
+  };
+
+  // Subir imagen
   const handleUpload = async () => {
-    if (!selectedFile) return;
-
+    if (!selectedFile || !userData?.uid || !token) return;
     setUploading(true);
+
     const formData = new FormData();
-    formData.append("correo", userData.email || "");
     formData.append("imagen", selectedFile);
-    formData.append("usoCodigoDescuento", false);
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/client-data`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${userData.token}` },
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Error al subir imagen");
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/client-data/${userData.uid}/image`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
 
-      const data = await res.json();
-      if (onImageUpdated) onImageUpdated(data); // Actualiza avatar en Dashboard
+      if (!res.ok) throw new Error("Error al subir la imagen");
+      console.log("✅ Imagen subida correctamente");
+
+      // Actualizar imagen visible
+      await loadProtectedImage();
+      if (onImageUploaded) onImageUploaded();
       setShowModal(false);
       setSelectedFile(null);
-    } catch (error) {
-      console.error("❌ Error uploading image:", error);
-      alert("Error al subir imagen");
+    } catch (err) {
+      console.error("❌ Error subiendo imagen:", err);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleViewProfile = () => setShowModal(true);
+  const handleViewProfile = () => {
+    setShowModal(true);
+    setIsMenuOpen(false);
+  };
+
+  const handleFileChange = (e) => setSelectedFile(e.target.files[0]);
 
   return (
     <nav className="sticky top-0 z-50 border-b bg-white/70 backdrop-bl supports-[backdrop-filter]:bg-white/60 shadow-sm">
@@ -62,34 +106,53 @@ export default function Header({ userData, onLogout, onImageUpdated }) {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Arepa Sunshine</h1>
-            <p className="text-xs text-yellow-600 font-medium">Corner Shop Delights</p>
+            <p className="text-xs text-yellow-600 font-medium">
+              Corner Shop Delights
+            </p>
           </div>
         </div>
 
         {/* Navegación + usuario */}
         <div className="flex items-center gap-6">
-          <a href="#productos" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">Productos</a>
-          <a href="#nosotros" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">Nosotros</a>
-          <a href="#contacto" className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors">Contacto</a>
+          <a
+            href="#productos"
+            className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors"
+          >
+            Productos
+          </a>
+          <a
+            href="#nosotros"
+            className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors"
+          >
+            Nosotros
+          </a>
+          <a
+            href="#contacto"
+            className="text-sm font-medium text-gray-700 hover:text-yellow-600 transition-colors"
+          >
+            Contacto
+          </a>
 
           <CartDrawer />
 
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 hover:bg-yellow-100 transition-colors duration-200 border-2 border-gray-200 hover:border-yellow-300"
+              className="flex items-center justify-center w-15 h-15 rounded-full bg-gray-100 hover:bg-yellow-100 transition-colors duration-200 border-2 border-gray-200 hover:border-yellow-300"
             >
               <img
-                src={userData?.imagen ? `${import.meta.env.VITE_API_URL}/api/client-data/${userData.uid}/image` : "/placeholder-image.jpg"}
+                src={profileImageUrl}
                 alt="Avatar"
-                className="w-8 h-8 rounded-full object-cover"
+                className="w-12 h-12 rounded-full object-cover"
               />
             </button>
 
             {isMenuOpen && (
               <div className="absolute right-0 top-12 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 py-2 z-40">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-white to-yellow-50 rounded-t-xl">
-                  <p className="text-sm font-semibold text-gray-900">{userData.name}</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {userData.name}
+                  </p>
                   <p className="text-xs text-gray-500">{userData.email}</p>
                 </div>
 
@@ -129,8 +192,10 @@ export default function Header({ userData, onLogout, onImageUpdated }) {
               </button>
               <button
                 onClick={handleUpload}
-                disabled={uploading}
-                className={`px-4 py-2 bg-yellow-400 text-gray-900 rounded hover:bg-yellow-500 ${uploading ? "opacity-50 cursor-not-allowed" : ""}`}
+                disabled={uploading || !selectedFile}
+                className={`px-4 py-2 bg-yellow-400 text-gray-900 rounded hover:bg-yellow-500 ${
+                  uploading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               >
                 {uploading ? "Subiendo..." : "Subir"}
               </button>

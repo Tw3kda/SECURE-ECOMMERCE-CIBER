@@ -8,10 +8,11 @@ public class PaymentRequest {
     private String cardholderName;
     private String expiryMonth;
     private String expiryYear;
+    private String ccv; // ✅ Campo agregado
     private Double amount;
     private String currency;
     private String items;
     private String direccion;
-    private Long clientDataId;
     private boolean usedCoupon;
+    private String clientDataId; // ✅ String para UUID de Keycloak
 }

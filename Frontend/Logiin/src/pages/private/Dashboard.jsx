@@ -47,8 +47,8 @@ export default function Dashboard() {
       fetch(`${import.meta.env.VITE_API_URL}/api/client-data/${user.uid}`, {
         headers: { Authorization: `Bearer ${keycloak.token}` },
       })
-        .then(res => res.json())
-        .then(data => {
+        .then((res) => res.json())
+        .then((data) => {
           if (!data || data.length === 0) {
             const formData = new FormData();
             formData.append("correo", email);
@@ -59,14 +59,16 @@ export default function Dashboard() {
               headers: { Authorization: `Bearer ${keycloak.token}` },
               body: formData,
             })
-              .then(r => r.json())
-              .then(created => console.log("✅ ClientData creado:", created))
-              .catch(err => console.error("❌ Error creando ClientData:", err));
+              .then((r) => r.json())
+              .then((created) => console.log("✅ ClientData creado:", created))
+              .catch((err) =>
+                console.error("❌ Error creando ClientData:", err)
+              );
           } else {
             console.log("✅ ClientData ya existe:", data);
           }
         })
-        .catch(err => console.error("❌ Error verificando ClientData:", err));
+        .catch((err) => console.error("❌ Error verificando ClientData:", err));
 
       fetchProductsWithImages(keycloak.token);
     } else {
@@ -78,22 +80,38 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const token = tokenParam || userData?.token;
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/products`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
         const processedProducts = await Promise.all(
           data.map(async (product) => {
             const hasImageData = product.hasImage && product.imageType;
-            if (!hasImageData) return { ...product, imageUrl: "/placeholder-image.jpg", hasImage: false };
+            if (!hasImageData)
+              return {
+                ...product,
+                imageUrl: "/placeholder-image.jpg",
+                hasImage: false,
+              };
 
             try {
-              const imageResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/products/${product.id}/image`, {
-                headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
-                mode: "cors",
-              });
+              const imageResponse = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/products/${
+                  product.id
+                }/image`,
+                {
+                  headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
+                  mode: "cors",
+                }
+              );
               if (imageResponse.ok) {
                 const imageBlob = await imageResponse.blob();
                 if (imageBlob.size > 0) {
@@ -102,9 +120,16 @@ export default function Dashboard() {
                 }
               }
             } catch (error) {
-              console.error(`🚨 Error fetching image for product ${product.id}:`, error);
+              console.error(
+                `🚨 Error fetching image for product ${product.id}:`,
+                error
+              );
             }
-            return { ...product, imageUrl: "/placeholder-image.jpg", hasImage: false };
+            return {
+              ...product,
+              imageUrl: "/placeholder-image.jpg",
+              hasImage: false,
+            };
           })
         );
         setProducts(processedProducts);
@@ -120,7 +145,8 @@ export default function Dashboard() {
   useEffect(() => {
     return () => {
       products.forEach((product) => {
-        if (product.hasImage && product.imageUrl) URL.revokeObjectURL(product.imageUrl);
+        if (product.hasImage && product.imageUrl)
+          URL.revokeObjectURL(product.imageUrl);
       });
     };
   }, [products]);
@@ -132,13 +158,24 @@ export default function Dashboard() {
 
   const handleRefreshProducts = () => fetchProductsWithImages();
   const handleCommentAdded = (productId, newComment) => {
-    setProducts(prev =>
-      prev.map(p => p.id === productId ? { ...p, comments: [...(p.comments || []), newComment] } : p)
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? { ...p, comments: [...(p.comments || []), newComment] }
+          : p
+      )
     );
   };
   const handleCommentRemoved = (productId, commentId) => {
-    setProducts(prev =>
-      prev.map(p => p.id === productId ? { ...p, comments: (p.comments || []).filter(c => c.id !== commentId) } : p)
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? {
+              ...p,
+              comments: (p.comments || []).filter((c) => c.id !== commentId),
+            }
+          : p
+      )
     );
   };
   const handleCreateProduct = () => {
@@ -151,14 +188,28 @@ export default function Dashboard() {
 
   if (!userData) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-600" style={{ background: "linear-gradient(135deg, rgba(255,255,224,0.8) 0%, rgba(255,255,200,0.6) 50%, rgba(255,255,180,0.4) 100%)", backdropFilter: "blur(10px)" }}>
+      <div
+        className="min-h-screen flex items-center justify-center text-gray-600"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(255,255,224,0.8) 0%, rgba(255,255,200,0.6) 50%, rgba(255,255,180,0.4) 100%)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
         <h2>Cargando información del usuario...</h2>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative" style={{ background: "linear-gradient(135deg, rgba(255,255,224,0.8) 0%, rgba(255,255,200,0.6) 50%, rgba(255,255,180,0.4) 100%)", backdropFilter: "blur(15px)" }}>
+    <div
+      className="min-h-screen relative"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(255,255,224,0.8) 0%, rgba(255,255,200,0.6) 50%, rgba(255,255,180,0.4) 100%)",
+        backdropFilter: "blur(15px)",
+      }}
+    >
       <Header
         userData={{ ...userData, email: userEmail }}
         isUserAdmin={isUserAdmin}
@@ -171,22 +222,13 @@ export default function Dashboard() {
       <main className="w-full py-16 px-4 relative z-10">
         {/* Hero Section */}
         <div className="max-w-7xl mx-auto text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
-            <span>☀️</span>
-            <span>Auténtico Sabor Arepense</span>
-          </div>
-          
           <div className="flex flex-col items-center mb-4">
-            <img
-              src={userData?.imagen ? `${import.meta.env.VITE_API_URL}/api/client-data/${userData.uid}/image` : "/placeholder-image.jpg"}
-              alt="Avatar usuario"
-              className="w-20 h-20 rounded-full border-2 border-gray-200 mb-2"
-            />
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-2">
               Arepas Artesanales
             </h1>
             <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-8">
-              Deliciosas arepas hechas a mano con amor. Disfruta el auténtico sabor de Arepabuelas en cada bocado.
+              Deliciosas arepas hechas a mano con amor. Disfruta el auténtico
+              sabor de Arepabuelas en cada bocado.
             </p>
           </div>
 
@@ -194,7 +236,11 @@ export default function Dashboard() {
             <button
               onClick={handleCreateProduct}
               disabled={!isUserAdmin}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md ${isUserAdmin ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 hover:shadow-lg hover:scale-105" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md ${
+                isUserAdmin
+                  ? "bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 hover:shadow-lg hover:scale-105"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
             >
               ➕ Crear Nuevo Producto
             </button>
@@ -202,7 +248,11 @@ export default function Dashboard() {
             <button
               onClick={handleRefreshProducts}
               disabled={loading}
-              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md ${loading ? "bg-gray-300 text-gray-500 cursor-not-allowed" : "bg-white text-gray-800 border-2 border-gray-300 hover:border-yellow-400 hover:shadow-lg"}`}
+              className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md ${
+                loading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-white text-gray-800 border-2 border-gray-300 hover:border-yellow-400 hover:shadow-lg"
+              }`}
             >
               {loading ? "🔄 Cargando..." : "🔄 Actualizar"}
             </button>
@@ -211,11 +261,15 @@ export default function Dashboard() {
 
         {/* Sección de productos */}
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-4xl font-bold text-center text-gray-900 mb-3">Nuestros Productos</h2>
+          <h2 className="text-4xl font-bold text-center text-gray-900 mb-3">
+            Nuestros Productos
+          </h2>
           <div className="w-24 h-1 bg-yellow-400 mx-auto mb-12"></div>
 
           {loading ? (
-            <p className="text-center text-gray-500 text-lg py-12">Cargando productos...</p>
+            <p className="text-center text-gray-500 text-lg py-12">
+              Cargando productos...
+            </p>
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {products.map((product) => (
@@ -240,9 +294,13 @@ export default function Dashboard() {
           ) : (
             <div className="text-center py-20">
               <div className="mb-6 text-6xl">🍽️</div>
-              <p className="text-xl text-gray-600 mb-2">No hay productos disponibles</p>
+              <p className="text-xl text-gray-600 mb-2">
+                No hay productos disponibles
+              </p>
               <p className="text-sm text-gray-500">
-                {isUserAdmin ? "Crea tu primer producto usando el botón de arriba" : "Vuelve pronto para ver nuestras deliciosas arepas"}
+                {isUserAdmin
+                  ? "Crea tu primer producto usando el botón de arriba"
+                  : "Vuelve pronto para ver nuestras deliciosas arepas"}
               </p>
             </div>
           )}

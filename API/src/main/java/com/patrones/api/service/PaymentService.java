@@ -7,9 +7,7 @@ import com.patrones.api.repository.PaymentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class PaymentService {
@@ -17,59 +15,53 @@ public class PaymentService {
     @Autowired
     private PaymentRepository paymentRepository;
 
-    private final Map<String, String> transactions = new ConcurrentHashMap<>();
-
     public PaymentResponse processPayment(PaymentRequest request) {
 
-        String cardNumber = request.getCardNumber();
-        String first6 = cardNumber != null && cardNumber.length() >= 6
-                ? cardNumber.substring(0, 6)
+        // --- Prepare masked card info ---
+        String first6 = request.getCardNumber() != null && request.getCardNumber().length() >= 6
+                ? request.getCardNumber().substring(0, 6)
                 : "000000";
-        String last4 = cardNumber != null && cardNumber.length() >= 4
-                ? cardNumber.substring(cardNumber.length() - 4)
+        String last4 = request.getCardNumber() != null && request.getCardNumber().length() >= 4
+                ? request.getCardNumber().substring(request.getCardNumber().length() - 4)
                 : "0000";
 
+        // --- Dummy tokenization ---
         String token = "tok_" + UUID.randomUUID();
         String transactionId = "txn_" + UUID.randomUUID();
         String status = "AUTHORIZED";
 
-        transactions.put(transactionId, status);
-
+        // --- Save only safe data in DB ---
         Payment payment = new Payment();
         payment.setTransactionId(transactionId);
-        payment.setStatus(status);
         payment.setToken(token);
+        payment.setStatus(status);
         payment.setCardBin(first6);
         payment.setCardLast4(last4);
-        payment.setCardholderName(request.getCardholderName());
-
-        // Convertir los campos numéricos si vienen como String
-        try {
-            payment.setExpiryMonth(request.getExpiryMonth());
-            payment.setExpiryYear(request.getExpiryYear());
-        } catch (Exception e) {
-            System.err.println("⚠ Error parsing expiry date: " + e.getMessage());
-        }
-
         payment.setAmount(request.getAmount());
-        payment.setCurrency(request.getCurrency());
-        payment.setItems(request.getItems());
+        payment.setCurrency("COP");
         payment.setDireccion(request.getDireccion());
-        payment.setClientDataId(request.getClientDataId());
+        payment.setClientDataId(request.getClientDataId()); // ✅ Direct String assignment
         payment.setUsedCoupon(request.isUsedCoupon());
 
         paymentRepository.save(payment);
 
+        // --- Build response ---
         PaymentResponse response = new PaymentResponse();
         response.setTransactionId(transactionId);
-        response.setStatus(status);
         response.setToken(token);
         response.setCardBin(first6);
         response.setCardLast4(last4);
-        response.setCardholderName(request.getCardholderName());
-        response.setExpiryMonth(request.getExpiryMonth());
-        response.setExpiryYear(request.getExpiryYear());
+        response.setStatus(status);
+        response.setAmount(request.getAmount());
+        response.setCurrency("COP");
         response.setUsedCoupon(request.isUsedCoupon());
+        response.setClientDataId(request.getClientDataId()); // ✅ Direct String assignment
+
+        // Log para debugging
+        System.out.println("✅ Pago procesado exitosamente");
+        System.out.println("📧 Transaction ID: " + transactionId);
+        System.out.println("👤 Cliente UUID: " + request.getClientDataId());
+        System.out.println("💵 Monto: " + request.getAmount());
 
         return response;
     }
