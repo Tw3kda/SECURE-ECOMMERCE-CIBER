@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ShoppingBag, User, LogOut } from "lucide-react";
-import CartDrawer from "./ui/CartDrawer";
+import CartDrawer from "./ui/cartDrawer";
 import { getKeycloak } from "../keycloak";
 
 export default function Header({ userData, onLogout, onImageUploaded }) {
