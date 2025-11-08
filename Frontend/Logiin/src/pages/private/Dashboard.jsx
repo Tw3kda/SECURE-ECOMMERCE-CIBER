@@ -3,6 +3,7 @@ import { getKeycloak } from "../../keycloak";
 import { useNavigate } from "react-router-dom";
 import Header from "../../components/Header";
 import ProductCard from "../../components/ProductCard";
+import ProductModal from "../../components/ProductModal";
 
 export default function Dashboard() {
   const [userData, setUserData] = useState(null);
@@ -10,6 +11,8 @@ export default function Dashboard() {
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   const parseJwt = (token) => {
@@ -131,22 +134,35 @@ export default function Dashboard() {
   };
 
   const handleRefreshProducts = () => fetchProductsWithImages();
+  
   const handleCommentAdded = (productId, newComment) => {
     setProducts(prev =>
       prev.map(p => p.id === productId ? { ...p, comments: [...(p.comments || []), newComment] } : p)
     );
   };
+  
   const handleCommentRemoved = (productId, commentId) => {
     setProducts(prev =>
       prev.map(p => p.id === productId ? { ...p, comments: (p.comments || []).filter(c => c.id !== commentId) } : p)
     );
   };
+
   const handleCreateProduct = () => {
     if (isUserAdmin) navigate("/CreateProduct");
   };
 
   const handleImageUpdated = (updatedData) => {
     setUserData((prev) => ({ ...prev, imagen: updatedData.imagen }));
+  };
+
+  const handleProductClick = (product) => {
+    setSelectedProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
   };
 
   if (!userData) {
@@ -219,22 +235,28 @@ export default function Dashboard() {
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  productId={product.id}
-                  image={product.imageUrl}
-                  name={product.name}
-                  description={product.description}
-                  price={product.price}
-                  rating={product.rating || 4.5}
-                  reviewCount={product.reviewCount || 0}
-                  commentCount={product.comments?.length || 0}
-                  initialComments={product.comments || []}
-                  onCommentAdded={handleCommentAdded}
-                  onCommentRemoved={handleCommentRemoved}
-                  onViewReviews={() => {}}
-                  isAdmin={isUserAdmin}
-                />
+                <div 
+                  key={product.id} 
+                  className="cursor-pointer transform hover:scale-105 transition-transform duration-300"
+                  onClick={() => handleProductClick(product)}
+                >
+                  <ProductCard
+                    productId={product.id}
+                    image={product.imageUrl}
+                    name={product.name}
+                    description={product.description}
+                    price={product.price}
+                    rating={product.rating || 4.5}
+                    reviewCount={product.reviewCount || 0}
+                    commentCount={product.comments?.length || 0}
+                    initialComments={product.comments || []}
+                    onCommentAdded={handleCommentAdded}
+                    onCommentRemoved={handleCommentRemoved}
+                    onViewReviews={() => {}}
+                    isAdmin={isUserAdmin}
+                    hideDescriptionButton={true} // Nueva prop para ocultar el botón descripción
+                  />
+                </div>
               ))}
             </div>
           ) : (
@@ -248,6 +270,17 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+
+      {/* Modal mejorado */}
+      {isModalOpen && selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          isAdmin={isUserAdmin}
+          onClose={handleCloseModal}
+          onCommentAdded={handleCommentAdded}
+          onCommentRemoved={handleCommentRemoved}
+        />
+      )}
     </div>
   );
 }
