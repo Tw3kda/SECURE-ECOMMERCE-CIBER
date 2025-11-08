@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+
+import java.time.LocalDateTime;
+
+
 @Service
 public class PaymentService {
 
@@ -40,8 +44,9 @@ public class PaymentService {
         payment.setAmount(request.getAmount());
         payment.setCurrency("COP");
         payment.setDireccion(request.getDireccion());
-        payment.setClientDataId(request.getClientDataId()); // ✅ Direct String assignment
+        payment.setClientUid(request.getClientDataId()); // ✅ Usar clientUid en lugar de clientDataId
         payment.setUsedCoupon(request.isUsedCoupon());
+        payment.setFechaPago(LocalDateTime.now());
 
         paymentRepository.save(payment);
 
@@ -55,13 +60,14 @@ public class PaymentService {
         response.setAmount(request.getAmount());
         response.setCurrency("COP");
         response.setUsedCoupon(request.isUsedCoupon());
-        response.setClientDataId(request.getClientDataId()); // ✅ Direct String assignment
+        response.setClientDataId(request.getClientDataId());
 
         // Log para debugging
         System.out.println("✅ Pago procesado exitosamente");
         System.out.println("📧 Transaction ID: " + transactionId);
-        System.out.println("👤 Cliente UUID: " + request.getClientDataId());
+        System.out.println("👤 Cliente UID: " + request.getClientDataId());
         System.out.println("💵 Monto: " + request.getAmount());
+        System.out.println("🎫 Cupón usado: " + request.isUsedCoupon());
 
         return response;
     }

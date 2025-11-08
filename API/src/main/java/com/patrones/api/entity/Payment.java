@@ -1,5 +1,8 @@
 package com.patrones.api.entity;
 
+import java.time.LocalDateTime;
+
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -16,16 +19,25 @@ public class Payment {
     private String status;
     private String token;
 
-    // Datos de la tarjeta (solo lo necesario para auditoría segura)
-    private String cardBin;        // Primeros 6 dígitos
-    private String cardLast4;      // Últimos 4 dígitos
+    // Datos de la tarjeta
+    private String cardBin;
+    private String cardLast4;
 
     // Datos de la transacción
     private Double amount;
     private String currency;
     private String items;
     private String direccion;
-    private String clientDataId; // ✅ String para UUID de Keycloak
-
     private boolean usedCoupon;
+
+    // Relación con ClientData (mantener para foreign key)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_data_id")
+    private ClientData clientData;
+
+    // UUID de Keycloak (nuevo campo)
+    @Column(name = "client_uid")
+    private String clientUid;
+
+    private LocalDateTime fechaPago;
 }

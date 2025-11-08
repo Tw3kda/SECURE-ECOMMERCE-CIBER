@@ -269,7 +269,7 @@ const PaymentModule = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-3 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Mes de Expiración
@@ -291,6 +291,18 @@ const PaymentModule = () => {
                     value={expiryYear}
                     onChange={(e) => setExpiryYear(e.target.value)}
                     placeholder="YYYY"
+                    className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    CCV
+                  </label>
+                  <input
+                    type="text"
+                    value={ccv}
+                    onChange={(e) => setCcv(e.target.value)}
+                    placeholder="XXX"
                     className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   />
                 </div>

@@ -2,7 +2,9 @@ package com.patrones.api.controller;
 
 import com.patrones.api.dto.PaymentRequest;
 import com.patrones.api.dto.PaymentResponse;
+import com.patrones.api.entity.ClientData;
 import com.patrones.api.entity.Payment;
+import com.patrones.api.repository.ClientDataRepository;
 import com.patrones.api.repository.PaymentRepository;
 import com.patrones.api.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -19,6 +22,9 @@ public class PaymentController {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private ClientDataRepository clientDataRepository;
 
     @Autowired
     private PaymentService paymentService;
@@ -53,13 +59,26 @@ public class PaymentController {
         payment.setItems(request.getItems());
         payment.setDireccion(request.getDireccion());
         payment.setUsedCoupon(request.isUsedCoupon());
-        payment.setClientDataId(request.getClientDataId()); // ✅ Direct String assignment
+        payment.setClientUid(request.getClientDataId()); // ✅ Almacenar UUID de Keycloak
 
-        // Log para debugging
+        // Buscar ClientData por uid y establecer relación
         if (request.getClientDataId() != null) {
-            System.out.println("🧾 Procesando pago para cliente UUID: " + request.getClientDataId());
-            System.out.println("💳 Cupón usado: " + request.isUsedCoupon());
-            System.out.println("💰 Monto: " + request.getAmount());
+            Optional<ClientData> clientDataOpt = clientDataRepository.findByUid(request.getClientDataId());
+            if (clientDataOpt.isPresent()) {
+                ClientData clientData = clientDataOpt.get();
+                payment.setClientData(clientData); // ✅ Establecer relación JPA
+                
+                // Actualizar cupón si se usó
+                if (request.isUsedCoupon() && !clientData.isUsoCodigoDescuento()) {
+                    clientData.setUsoCodigoDescuento(true);
+                    clientDataRepository.save(clientData);
+                    System.out.println("🎉 Cupón activado para cliente: " + clientData.getUid());
+                }
+                
+                System.out.println("🧾 Cliente: " + clientData.getUid() + " - " + clientData.getCorreo());
+            } else {
+                System.out.println("⚠️ No se encontró ClientData para UID: " + request.getClientDataId());
+            }
         }
 
         return paymentRepository.save(payment);
